@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.epay.ewallet.service.admin.mapperDataOne.IEcode">
+
+	<resultMap type="com.epay.ewallet.service.admin.model.Ecode" id="Ecode1">
+		<result property="ecode" column="ERROR_CODE" />
+		<result property="language" column="ERROR_LANG" />
+		<result property="message" column="ERROR_MESSAGE" />
+		<result property="p_ecode" column="P_ERROR_CODE" />
+		<result property="p_message" column="P_ERROR_MESSAGE" />
+	</resultMap>
+	<select id="getEcode" parameterType="HashMap" resultMap="Ecode1">
+		SELECT * FROM TBL_ERROR_CODE
+		WHERE ERROR_CODE = #{ERROR_CODE}
+		AND ERROR_LANG = #{ERROR_LANG}
+	</select>
+
+	<select id="getMappingErrorCode" resultType="Map">
+		SELECT 
+			* 
+		FROM 
+			TBL_MAPPING_ERROR_CODE
+		WHERE 
+			PROVIDER_ID = #{PROVIDER_ID}
+			AND PROVIDER_CODE = #{PROVIDER_CODE}
+	</select>
+
+</mapper>

@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.epay.ewallet.service.admin.mapperDataOne.IUser">
+	<select id="loadUserByPhone" parameterType="String" resultType="Map"> 
+     	SELECT * FROM TBL_USERS
+    	WHERE PHONE = #{phone}  
+	</select>
+	<resultMap type="com.epay.ewallet.service.admin.model.User" id="User">
+		<result property="id" column="ID" />
+		<result property="phoneNumber" column="PHONE" />
+		<result property="name" column="NAME" />
+		<result property="email" column="EMAIL" />
+		<result property="status" column="STATUS" />
+		<result property="personalId" column="PERSONAL_ID" />
+		<result property="personalIdType" column="PERSONAL_ID_TYPE" />
+		<result property="lang" column="LANG" />
+		<result property="password" column="PASSWORD" />
+		<result property="companyId" column="COMPANY_ID" />
+		<result property="avatar" column="AVATAR" />
+	</resultMap>
+	<select id="getUserByPhone" parameterType="String" resultMap="User"> 
+    	SELECT * FROM TBL_USERS
+		WHERE PHONE = #{PHONE_NUMBER}  
+	</select>
+	<select id="getUserById" parameterType="String" resultMap="User"> 
+    	SELECT * FROM TBL_USERS
+    	WHERE ID = #{ID}  
+	</select>
+	<select id="getPositionByPhone" parameterType="String" resultType="String">
+		SELECT POSITTION FROM TBL_COMPANY_USER
+		WHERE PHONE_NUMBER = #{PHONE_NUMBER}
+	</select>
+</mapper>
