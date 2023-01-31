@@ -6,6 +6,8 @@ import org.springframework.stereotype.Service;
 import com.epay.ewallet.service.admin.mapperDataOne.IUser;
 import com.epay.ewallet.service.admin.model.User;
 
+import java.util.List;
+
 @Service
 public class UserService {
 
@@ -14,5 +16,12 @@ public class UserService {
 
 	public User getUser(String phone) {
 		return userDao.getUserByPhone(phone);
+	}
+	public User getUserById(String Id){
+		return  userDao.getUserById(Id);
+	}
+
+	public List<User> getAllUserByPosts(List<String> postId){
+		return  userDao.getAllUserByPosts(postId);
 	}
 }

@@ -31,4 +31,12 @@
 		SELECT POSITTION FROM TBL_COMPANY_USER
 		WHERE PHONE_NUMBER = #{PHONE_NUMBER}
 	</select>
+
+	<select id="getAllUserByPosts" resultMap="User">
+		SELECT * FROM TBL_USERS WHERE id IN
+		<foreach collection="list" item="postId" open="(" separator="," close=")">
+			#{postId}
+		</foreach>
+	</select>
+
 </mapper>
