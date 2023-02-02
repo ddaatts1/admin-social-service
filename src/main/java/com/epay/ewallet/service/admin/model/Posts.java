@@ -27,16 +27,37 @@ public class Posts {
     private int countReport;
 
     @Transient
-    String image;
+    List<String> images;
     @Transient
     UserDTO user;
+    @Transient
+    List<HashTags> hashTags;
 
-    public String getImage() {
-        return image;
+    @Transient
+    List<Tags> tags;
+
+    public List<Tags> getTags() {
+        return tags;
     }
 
-    public void setImage(String image) {
-        this.image = image;
+    public void setTags(List<Tags> tags) {
+        this.tags = tags;
+    }
+
+    public List<HashTags> getHashTags() {
+        return hashTags;
+    }
+
+    public void setHashTags(List<HashTags> hashTags) {
+        this.hashTags = hashTags;
+    }
+
+    public List<String> getImages() {
+        return images;
+    }
+
+    public void setImages(List<String> images) {
+        this.images = images;
     }
 
     public UserDTO getUser() {
@@ -48,6 +69,11 @@ public class Posts {
     }
 
     public Posts() {
+    }
+
+    public Posts(String post_id, String userId){
+        this.set_id(post_id);
+        this.setUserId(userId);
     }
 
     public String get_id() {

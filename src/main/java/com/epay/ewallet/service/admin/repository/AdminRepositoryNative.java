@@ -7,9 +7,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.stream.Collectors;
 
-import com.epay.ewallet.service.admin.model.Posts;
-import com.epay.ewallet.service.admin.model.User;
-import com.epay.ewallet.service.admin.model.UserGroup;
+import com.epay.ewallet.service.admin.model.*;
+import com.epay.ewallet.service.admin.payloads.request.ApproveRejectPostRequest;
 import com.epay.ewallet.service.admin.payloads.request.AssignAdminRequest;
 import com.epay.ewallet.service.admin.payloads.request.GetListPostFilterRequest;
 import com.epay.ewallet.service.admin.payloads.response.CommonResponse;
@@ -44,6 +43,7 @@ public class AdminRepositoryNative {
     @Value("${spring.data.mongodb.database_}")
     private String db;
 
+
     public ArrayList<HashMap<String, String>> getListAdmin(String groupId) {
         ArrayList<HashMap<String, String>> arrL = new ArrayList<HashMap<String, String>>();
         try {
@@ -73,7 +73,6 @@ public class AdminRepositoryNative {
 //				String groupIdXXX = (String) (hsh.get("groupId"));
 //				String createDate = hsh.get("createDate").toString();
 //				System.out.println("id: " + id + ", roleId: " + roleId + ", groupIdXXX: " + groupIdXXX + ", createDate: " + createDate); 
-
 
 //				Binary xx = (a_document.get("DATA_OUT_BIN",Binary.class));
 //				System.out.println("DATA_OUT_BIN: " + Arrays.toString(xx.getData()));
@@ -196,94 +195,91 @@ public class AdminRepositoryNative {
 
     public long assignSuperAdmin(AssignAdminRequest request, UserGroup userGroup) {
 
-        try{
+        try {
             MongoDatabase database = mongoClient.getDatabase(db);
             MongoCollection<Document> collection = database.getCollection("user_group");
 
             //update roleid cua admin va superadmin
             Bson filterSuperAdmin = Filters.eq("userId", userGroup.getUserId());
-            Bson filterAdmin = Filters.eq("userId",request.getUserIdDest());
+            Bson filterAdmin = Filters.eq("userId", request.getUserIdDest());
             Bson updateAdmin = Updates.set("roleId", 3);
-            Bson updateSuperAdmin = Updates.set("roleId",2);
+            Bson updateSuperAdmin = Updates.set("roleId", 2);
 
-             UpdateResult updateResult1 = collection.updateOne(filterAdmin, updateAdmin);
-            UpdateResult updateResult2 =collection.updateOne(filterSuperAdmin,updateSuperAdmin);
+            UpdateResult updateResult1 = collection.updateOne(filterAdmin, updateAdmin);
+            UpdateResult updateResult2 = collection.updateOne(filterSuperAdmin, updateSuperAdmin);
 
-            return updateResult1.getModifiedCount()+ updateResult1.getModifiedCount();
+            return updateResult1.getModifiedCount() + updateResult1.getModifiedCount();
 
 
-        }catch (Exception e){
+        } catch (Exception e) {
             e.printStackTrace();
-            log.error("assign_superadmin!",e);
+            log.error("assign_superadmin!", e);
         }
-        return-1;
+        return -1;
     }
 
-    public List<Posts> getListPostFilter(GetListPostFilterRequest request, User user){
+    public List<Posts> getListPostFilter(GetListPostFilterRequest request, User user) {
 
         log.info("GET LIST POST FILTER ");
-        try{
-            List<Posts> listPosts= new ArrayList<>();
+        try {
+            List<Posts> listPosts = new ArrayList<>();
             MongoDatabase database = mongoClient.getDatabase(db);
             //neu flag = saved
-            if(request.getFlag().equalsIgnoreCase("SAVED")){
+            if (request.getFlag().equalsIgnoreCase("SAVED")) {
                 MongoCollection<Document> savedPostsCollection = database.getCollection("saved_posts");
                 FindIterable<Document> savedPosts;
-                List<String> postIds ;
-                if(request.getScope().equalsIgnoreCase("ALL")){
+                List<String> postIds;
+                if (request.getScope().equalsIgnoreCase("ALL")) {
                     //lay  cac post duoc luu boi tat ca user trong bang saved_posts
-                     savedPosts = savedPostsCollection.find();
-                }
-                else {
-                    //lay cac post duoc luu boi chinh user dang dang nhap trong bang saved_posts
-                     savedPosts = savedPostsCollection.find(Filters.eq("userId",Integer.toString(user.getId())));
+                    savedPosts = savedPostsCollection.find();
+                } else {
+                    //lay cac post  duoc luu boi chinh user dang dang nhap trong bang saved_posts
+                    savedPosts = savedPostsCollection.find(Filters.eq("userId", Integer.toString(user.getId())));
                 }
                 //lay cac post trong bang posts
                 postIds = savedPosts.map(doc -> doc.get("postId").toString()).into(new ArrayList<>());
                 MongoCollection<Document> postsCollection = database.getCollection("posts");
-                FindIterable<Document> posts = postsCollection.find(Filters.in("_id",postIds));
+                FindIterable<Document> posts = postsCollection.find(Filters.in("_id", postIds));
                 ObjectMapper objectMapper = new ObjectMapper();
-                listPosts = posts.map(p->objectMapper.convertValue(p,Posts.class)).into(new ArrayList<>());
+                listPosts = posts.map(p -> objectMapper.convertValue(p, Posts.class)).into(new ArrayList<>());
 
-            }
-            else if (request.getFlag().equalsIgnoreCase("REPORTED_REMOVED")) {
+            } else if (request.getFlag().equalsIgnoreCase("REPORTED_REMOVED")) {
                 //neu flag = REPORTED_REMOVED
-                MongoCollection<Document> postsCollection= database.getCollection("posts");
-                MongoIterable<Document> reportedRemovedPosts =null;
-                if(request.getScope().equalsIgnoreCase("ALL")){
+                MongoCollection<Document> postsCollection = database.getCollection("posts");
+                MongoIterable<Document> reportedRemovedPosts = null;
+                if (request.getScope().equalsIgnoreCase("ALL")) {
                     //lay at ca cac post bi report hoac remove cua tat ca user
-                    reportedRemovedPosts= postsCollection.find(Filters.or(
+                    reportedRemovedPosts = postsCollection.find(Filters.or(
                             Filters.gt("countReport", 0), Filters.eq("status", "REMOVED")
                     ));
-                }else {
+                } else {
                     //lay at ca cac post bi report hoac remove cua user dang dang nhap
-                    reportedRemovedPosts= postsCollection.find(Filters.and(Filters.eq("userId",Integer.toString(user.getId())),Filters.or(
+                    reportedRemovedPosts = postsCollection.find(Filters.and(Filters.eq("userId", Integer.toString(user.getId())), Filters.or(
                             Filters.gt("countReport", 0), Filters.eq("status", "REMOVED"))));
                 }
 
                 ObjectMapper objectMapper = new ObjectMapper();
-                listPosts = reportedRemovedPosts.map(p->objectMapper.convertValue(p,Posts.class)).into(new ArrayList<>());
+                listPosts = reportedRemovedPosts.map(p -> objectMapper.convertValue(p, Posts.class)).into(new ArrayList<>());
 
-            }
-            else {
+            } else {
                 // neu flag la HIDDEN , PENDING
-                MongoCollection<Document> postsCollection= database.getCollection("posts");
+                MongoCollection<Document> postsCollection = database.getCollection("posts");
                 MongoIterable<Document> reportedRemovedPosts = null;
-                if(request.getScope().equalsIgnoreCase("ALL")){
-                    reportedRemovedPosts= postsCollection.find(Filters.eq("status",request.getFlag()));
-                }else {
-                    reportedRemovedPosts= postsCollection.find(Filters.and(Filters.eq("userId",Integer.toString(user.getId())),Filters.eq("status",request.getFlag())));
+                if (request.getScope().equalsIgnoreCase("ALL")) {
+                    reportedRemovedPosts = postsCollection.find(Filters.eq("status", request.getFlag()));
+                } else {
+                    reportedRemovedPosts = postsCollection.find(Filters.and(Filters.eq("userId", Integer.toString(user.getId())), Filters.eq("status", request.getFlag())));
                 }
                 ObjectMapper objectMapper = new ObjectMapper();
-                listPosts = reportedRemovedPosts.map(p->objectMapper.convertValue(p,Posts.class)).into(new ArrayList<>());
+                listPosts = reportedRemovedPosts.map(p -> objectMapper.convertValue(p, Posts.class)).into(new ArrayList<>());
             }
 
             return listPosts;
 
-        }catch (Exception e){
+        } catch (Exception e) {
 
             e.printStackTrace();
-            log.error("get_list_post_filter!",e);
+            log.error("get_list_post_filter!", e);
 
         }
 
@@ -292,14 +288,15 @@ public class AdminRepositoryNative {
 
     public List<Document> getListMediaByListPosts(List<Posts> list) {
 
-        List<String> listPostsId = list.stream().map(p->p.get_id()).collect(Collectors.toList());
-        List<Document> listmedia=null;
-        try{
+        List<String> listPostsId = list.stream().map(p -> p.get_id()).collect(Collectors.toList());
+        List<Document> listmedia = null;
+        try {
             MongoDatabase database = mongoClient.getDatabase(db);
             MongoCollection<Document> collection = database.getCollection("media");
-             listmedia = collection.find(Filters.in("referenceId",listPostsId)).into(new ArrayList<>());
+            listmedia = collection.find(Filters.in("referenceId", listPostsId)).into(new ArrayList<>());
 
-        }catch (Exception e){
+        } catch (Exception e) {
+            log.info(e.getMessage());
 
         }
         return listmedia;
@@ -307,4 +304,86 @@ public class AdminRepositoryNative {
     }
 
 
+    public List<HashTags> getlistHashTagByListPosts(List<Posts> list) {
+        List<String> listPostsId = list.stream().map(p -> p.get_id()).collect(Collectors.toList());
+        List<HashTags> listHashTag = null;
+        ObjectMapper mapper = new ObjectMapper();
+
+        try {
+            MongoDatabase database = mongoClient.getDatabase(db);
+            MongoCollection<Document> collection = database.getCollection("hashtags");
+            listHashTag = collection.find(Filters.in("postId", listPostsId)).into(new ArrayList<>()).
+                    stream().map(h -> mapper.convertValue(h, HashTags.class)).collect(Collectors.toList());
+
+        } catch (Exception e) {
+            log.info(e.getMessage());
+        }
+
+        return listHashTag;
+    }
+
+    public List<Tags> getListTagByListPosts(List<Posts> list) {
+        List<String> listPostsId = list.stream().map(p -> p.get_id()).collect(Collectors.toList());
+        List<Tags> tags = null;
+        ObjectMapper mapper = new ObjectMapper();
+
+        try {
+            MongoDatabase database = mongoClient.getDatabase(db);
+            MongoCollection<Document> collection = database.getCollection("tags");
+
+            tags = collection.find(Filters.in("postId", listPostsId)).into(new ArrayList<>()).
+                    stream().map(h -> mapper.convertValue(h, Tags.class)).collect(Collectors.toList());
+
+        } catch (Exception e) {
+            log.info(e.getMessage());
+        }
+
+        return tags;
+
+    }
+
+    public long approve_reject_post(ApproveRejectPostRequest request, User user) {
+
+        try{
+
+            MongoDatabase database = mongoClient.getDatabase(db);
+            MongoCollection<Document> collection = database.getCollection("posts");
+
+            if(request.getFlag().equalsIgnoreCase("APPROVE")){
+                //approve post
+
+                ArrayList<Bson> arrL = new ArrayList<>();
+                Bson status = Updates.set("status","ACTIVE");
+                Bson byAdmin = Updates.set("byadmin",user.getName());
+                arrL.add(status);
+                arrL.add(byAdmin);
+
+                UpdateResult updateResult  = collection.updateOne(Filters.eq("_id",request.getPostId()),arrL);
+                log.info( " => getMatchedCount: " + updateResult.getMatchedCount() + ",getModifiedCount: " + updateResult.getModifiedCount());
+                return updateResult.getMatchedCount();
+            }
+            else {
+                //reject post
+                ArrayList<Bson> arrL = new ArrayList<>();
+                Bson status = Updates.set("status","REJECT");
+                Bson byAdmin = Updates.set("byadmin",user.getName());
+                Bson reason = Updates.set("reason",request.getReason());
+                arrL.add(status);
+                arrL.add(byAdmin);
+                if(request.getReportType().equalsIgnoreCase("OTHER"))
+                arrL.add(reason);
+
+                UpdateResult updateResult  = collection.updateOne(Filters.eq("_id",request.getPostId()),arrL);
+                log.info( " => getMatchedCount: " + updateResult.getMatchedCount() + ",getModifiedCount: " + updateResult.getModifiedCount());
+                return updateResult.getMatchedCount();
+
+            }
+
+        }catch (Exception e){
+            log.info(e.getMessage());
+        }
+
+
+        return  0;
+    }
 }

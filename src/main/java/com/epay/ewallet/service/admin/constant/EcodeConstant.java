@@ -23,4 +23,5 @@ public class EcodeConstant {
 	public static String REACT_TYPE_NULL_EMPTY = "1002";
 	public static String TYPE_NULL_EMPTY = "1003";
 	public static String INVALID_USER ="1020";
+
 }

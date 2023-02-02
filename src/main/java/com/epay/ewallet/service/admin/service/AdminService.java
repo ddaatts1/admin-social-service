@@ -1,10 +1,7 @@
 package com.epay.ewallet.service.admin.service;
 
 import com.epay.ewallet.service.admin.model.User;
-import com.epay.ewallet.service.admin.payloads.request.ApprovePostRequest;
-import com.epay.ewallet.service.admin.payloads.request.AssignAdminRequest;
-import com.epay.ewallet.service.admin.payloads.request.GetListPostFilterRequest;
-import com.epay.ewallet.service.admin.payloads.request.OnoffAutoRemoveRequest;
+import com.epay.ewallet.service.admin.payloads.request.*;
 import com.epay.ewallet.service.admin.payloads.response.CommonResponse;
 
 
@@ -24,4 +21,7 @@ public interface AdminService {
 
     CommonResponse<Object> get_list_post_filter(GetListPostFilterRequest request,User user,String requestId);
 
+    CommonResponse<Object> get_list_reports(GetListReportsRequest getListReportsRequest, User user, String requestId);
+
+	CommonResponse<Object> approve_reject_post(ApproveRejectPostRequest approveRejectPostRequest, User user, String requestId);
 }
