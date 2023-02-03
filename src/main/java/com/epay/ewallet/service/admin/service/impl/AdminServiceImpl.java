@@ -7,6 +7,7 @@ import com.epay.ewallet.service.admin.constant.Constant;
 import com.epay.ewallet.service.admin.model.*;
 import com.epay.ewallet.service.admin.payloads.request.*;
 import com.epay.ewallet.service.admin.payloads.response.UserDTO;
+import com.epay.ewallet.service.admin.repository.*;
 import com.epay.ewallet.service.admin.service.UserService;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -16,14 +17,12 @@ import org.springframework.stereotype.Service;
 
 import com.epay.ewallet.service.admin.constant.EcodeConstant;
 import com.epay.ewallet.service.admin.payloads.response.CommonResponse;
-import com.epay.ewallet.service.admin.repository.AdminRepositoryNative;
-import com.epay.ewallet.service.admin.repository.GroupsettingRepository;
-import com.epay.ewallet.service.admin.repository.UserGroupRepository;
 import com.epay.ewallet.service.admin.service.AdminService;
 import com.epay.ewallet.service.admin.service.CodeService;
 
 @Service
 public class AdminServiceImpl implements AdminService {
+
 
     @Autowired
     private GroupsettingRepository groupsettingRepository;
@@ -38,10 +37,14 @@ public class AdminServiceImpl implements AdminService {
     @Autowired
     UserService userService;
 
+    @Autowired
+    PostsRepository postsRepository;
     public AdminServiceImpl(UserGroupRepository userGroupRepository) {
         this.userGroupRepository = userGroupRepository;
     }
 
+    @Autowired
+    CommentRepository commentRepository;
 //	@Autowired
 //	private CodeService code;
 
@@ -454,6 +457,107 @@ public class AdminServiceImpl implements AdminService {
         return response;
     }
 
+    @Override
+    public CommonResponse<Object> remove_reported_obj(ApproveRejectPostRequest request, User user, String requestId) {
+
+        CommonResponse<Object> response = new CommonResponse<>();
+
+        //validate
+        if(!Arrays.asList("REMOVE","REJECT").contains(request.getFlag())){
+            response.setEcode(EcodeConstant.FLAG_NULL_EMPTY);
+            return response;
+        }
+
+        if(request.getFlag().equalsIgnoreCase("REMOVE"))
+        if(!Arrays.asList("SPAM","BREAK_COM_RULE","FALSENEW","MEM_CONFLICT","OTHER").contains(request.getReportType())){
+            response.setEcode(EcodeConstant.FLAG_NULL_EMPTY);
+            return response;
+        }
+
+        //kiem tra quyen admin
+        UserGroup userGroup = userGroupRepository.findByUserId(Integer.toString(user.getId()), "1");
+        log.info("Check quyền SupperAdmin");
+        if (userGroup != null) {
+            if (userGroup.getRoleId() < 2) { //neu user khong phai la  admin
+                response.setEcode(EcodeConstant.ERROR_NOT_ADMIN);
+                return response;
+            }
+        } else { //neu user khong phai la  admin
+            response.setEcode(EcodeConstant.ERROR_NOT_ADMIN);
+            return response;
+        }
+
+        long count =adminRepositoryNative.remove_reported_obj(request,user );
+
+        if(count >=2){
+            response.setEcode(EcodeConstant.SUCCESS);
+            response.setData(request.getPostId());
+            return response;
+        }
+        else {
+            response.setEcode(EcodeConstant.ERR);
+            response.setData(request.getPostId());
+            return response;
+        }
+
+    }
+
+    @Override
+    public CommonResponse<Object> report_obj(ApproveRejectPostRequest request, User user, String requestId) {
+
+
+        CommonResponse<Object> response = new CommonResponse<>();
+
+        //check user role (la admin thi bao loi)
+        UserGroup userGroup = userGroupRepository.findByUserId(Integer.toString(user.getId()),"1");
+        if(userGroup != null){
+            if(userGroup.getRoleId() >=2){
+                response.setEcode(EcodeConstant.ERR);
+                return response;
+            }
+        }
+
+        //check user co phai la chu bai viet/comment (neu la chu bai viet thi bao loi)
+        String type = null;
+        type = request.getPostId().trim().split("_")[0];
+        if(type.equalsIgnoreCase("post")){
+            Optional<Posts> posts =  postsRepository.findById(request.getPostId());
+            if(posts.isPresent()){
+                if(posts.get().getUserId().equalsIgnoreCase(Integer.toString(user.getId()))){
+                    //thong bao user la chu bai viet
+                    response.setEcode(EcodeConstant.ERR);
+                    return response;
+                }
+            }
+        }
+        else  if(type.equalsIgnoreCase("comment")){
+            Optional<Comment> comments =  commentRepository.findById(request.getPostId());
+            if(comments.isPresent()){
+                if(comments.get().getUserId().equalsIgnoreCase(Integer.toString(user.getId()))){
+                    //thong bao user la chu bai viet
+                    response.setEcode(EcodeConstant.ERR);
+                    return response;
+                }
+            }
+        }
+        else {
+            response.setEcode(EcodeConstant.ERR);
+            return response;
+        }
+
+       boolean flag = adminRepositoryNative.report_obj(request,user);
+        if (flag){
+            response.setEcode(EcodeConstant.SUCCESS);
+            response.setData(request.getPostId());
+            return response;
+        }
+        else {
+            response.setEcode(EcodeConstant.ERR);
+            response.setData(request.getPostId());
+            return response;
+        }
+
+    }
 
     @Override
     public CommonResponse<Object> listAdmin(ApprovePostRequest request, User user, String requestId) {

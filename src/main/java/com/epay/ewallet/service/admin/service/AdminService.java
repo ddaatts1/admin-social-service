@@ -24,4 +24,8 @@ public interface AdminService {
     CommonResponse<Object> get_list_reports(GetListReportsRequest getListReportsRequest, User user, String requestId);
 
 	CommonResponse<Object> approve_reject_post(ApproveRejectPostRequest approveRejectPostRequest, User user, String requestId);
+
+	CommonResponse<Object> remove_reported_obj(ApproveRejectPostRequest approveRejectPostRequest, User user, String requestId);
+
+    CommonResponse<Object> report_obj(ApproveRejectPostRequest approveRejectPostRequest, User user, String requestId);
 }

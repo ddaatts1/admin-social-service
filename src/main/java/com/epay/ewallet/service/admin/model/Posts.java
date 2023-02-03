@@ -4,13 +4,17 @@ package com.epay.ewallet.service.admin.model;
 import com.epay.ewallet.service.admin.payloads.response.UserDTO;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import org.springframework.data.annotation.Transient;
+import org.springframework.data.mongodb.core.mapping.Document;
 
+import javax.persistence.Id;
 import javax.validation.constraints.Max;
 import java.util.Date;
 import java.util.List;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
+@Document(collection = "posts")
 public class Posts {
+    @Id
     private String _id;
     private String userId;
     private String groupId;

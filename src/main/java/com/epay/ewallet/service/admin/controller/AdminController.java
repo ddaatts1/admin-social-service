@@ -595,13 +595,12 @@ public class AdminController {
         }
 
 
-
     }
 
     @RequestMapping(value = "/admin/APPROVE_REJECT_POST", method = RequestMethod.POST)
     public CommonResponse<Object> apprrove_reject_post(@RequestBody JsonNode requestRaw,
-                                                @RequestHeader Map<String, String> header,
-                                                @RequestParam(required = false, defaultValue = "true") boolean encrypted) {
+                                                       @RequestHeader Map<String, String> header,
+                                                       @RequestParam(required = false, defaultValue = "true") boolean encrypted) {
 
         String logCategory = "APPROVE_REJECT_POST";
         log.info("-=====================> APPROVE_REJECT_POST" + requestRaw.toString());
@@ -669,10 +668,155 @@ public class AdminController {
             }
 
         }
-
-
-
     }
+
+
+    @RequestMapping(value = "/admin/REMOVE_REPORTED_OBJ", method = RequestMethod.POST)
+    public CommonResponse<Object> remove_reported_obj(@RequestBody JsonNode requestRaw,
+                                                       @RequestHeader Map<String, String> header,
+                                                       @RequestParam(required = false, defaultValue = "true") boolean encrypted) {
+
+        String logCategory = "REMOVE_REPORTED_OBJ";
+        log.info("-=====================> REMOVE_REPORTED_OBJ" + requestRaw.toString());
+
+        Gson gson = new Gson();
+        String requestId = header.get("requestid");
+        String language = header.get("language");
+        String deviceId = Utils.getDeviceIdFromHeader(header);
+
+        log.info("===> REMOVE_REPORTED_OBJ => encrypted: " + encrypted + " => requestId: " + requestId + " => request raw from client: " + requestRaw.toString());
+
+
+        ApproveRejectPostRequest approveRejectPostRequest = decodeData.getRequest(requestId, logCategory, requestRaw,
+                ApproveRejectPostRequest.class, encrypted, deviceId);
+
+        log.info("===========> REMOVE_REPORTED_OBJ => requestId: " + requestId + " => request clear from client: " + approveRejectPostRequest.toString());
+
+        log.info("{} | {} | Start | header={} | request={} | encrypted={}", requestId, logCategory, gson.toJson(header),
+                gson.toJson(approveRejectPostRequest), encrypted);
+
+        CommonResponse<Object> response = new CommonResponse<>();
+        try {
+            String bearerToken = header.get("authorization");
+            String token = jwtTokenUtil.getTokenFromBearerToken(bearerToken);
+            String phone = jwtTokenUtil.getUsernameFromToken(token);
+            User user = userDao.getUserByPhone(phone);
+            log.info("===> REMOVE_REPORTED_OBJ => userDO from DB: " + user);
+
+            response = adminService.remove_reported_obj(approveRejectPostRequest, user, requestId);
+
+            // Jump to finally code block before return
+            return response;
+
+        } catch (Exception e) {
+            log.fatal("{} | {} | Exception | error={}", requestId, logCategory, e);
+            e.printStackTrace();
+
+            response.setEcode(EcodeConstant.EXCEPTION);
+
+            // Jump to finally code block before return
+            return response;
+
+        } finally {
+            /**
+             * Actions before return
+             */
+            if (response.getMessage() == null || response.getMessage().isEmpty() == true) {
+                // Set ecode message, p_ecode, p_message
+                Ecode ecode = codeService.getEcode(response.getEcode(), language);
+                response.setMessage(ecode.getMessage());
+                response.setP_ecode(ecode.getP_ecode());
+                response.setP_message(ecode.getP_message());
+//                response.setData(assignAdminRequest.getUserIdDest());
+            }
+
+            log.info("===> REMOVE_REPORTED_OBJ => response clear: " + new Gson().toJson(response));
+
+            /**
+             * Encrypt data
+             */
+            if (encrypted == true) {
+                String encryptedData = decodeData.encrypt(requestId, logCategory, deviceId, response.getData());
+                response.setData(encryptedData);
+                log.info("<===========================  response raw for requestId: " + requestId + " => " + new Gson().toJson(response));
+            }
+
+        }
+    }
+
+    @RequestMapping(value = "/admin/REPORT_OBJ", method = RequestMethod.POST)
+    public CommonResponse<Object> report_obj(@RequestBody JsonNode requestRaw,
+                                                      @RequestHeader Map<String, String> header,
+                                                      @RequestParam(required = false, defaultValue = "true") boolean encrypted) {
+
+        String logCategory = "REPORT_OBJ";
+        log.info("-=====================> REPORT_OBJ" + requestRaw.toString());
+
+        Gson gson = new Gson();
+        String requestId = header.get("requestid");
+        String language = header.get("language");
+        String deviceId = Utils.getDeviceIdFromHeader(header);
+
+        log.info("===> REPORT_OBJ => encrypted: " + encrypted + " => requestId: " + requestId + " => request raw from client: " + requestRaw.toString());
+
+        ApproveRejectPostRequest reportObjRequest = decodeData.getRequest(requestId, logCategory, requestRaw,
+                ApproveRejectPostRequest.class, encrypted, deviceId);
+
+        log.info("===========> REPORT_OBJ => requestId: " + requestId + " => request clear from client: " + reportObjRequest.toString());
+
+        log.info("{} | {} | Start | header={} | request={} | encrypted={}", requestId, logCategory, gson.toJson(header),
+                gson.toJson(reportObjRequest), encrypted);
+
+        CommonResponse<Object> response = new CommonResponse<>();
+        try {
+            String bearerToken = header.get("authorization");
+            String token = jwtTokenUtil.getTokenFromBearerToken(bearerToken);
+            String phone = jwtTokenUtil.getUsernameFromToken(token);
+            User user = userDao.getUserByPhone(phone);
+            log.info("===> REPORT_OBJ => userDO from DB: " + user);
+
+            response = adminService.report_obj(reportObjRequest, user, requestId);
+
+            // Jump to finally code block before return
+            return response;
+
+        } catch (Exception e) {
+            log.fatal("{} | {} | Exception | error={}", requestId, logCategory, e);
+            e.printStackTrace();
+
+            response.setEcode(EcodeConstant.EXCEPTION);
+
+            // Jump to finally code block before return
+            return response;
+
+        } finally {
+            /**
+             * Actions before return
+             */
+            if (response.getMessage() == null || response.getMessage().isEmpty() == true) {
+                // Set ecode message, p_ecode, p_message
+                Ecode ecode = codeService.getEcode(response.getEcode(), language);
+                response.setMessage(ecode.getMessage());
+                response.setP_ecode(ecode.getP_ecode());
+                response.setP_message(ecode.getP_message());
+//                response.setData(assignAdminRequest.getUserIdDest());
+            }
+
+            log.info("===> REPORT_OBJ => response clear: " + new Gson().toJson(response));
+
+            /**
+             * Encrypt data
+             */
+            if (encrypted == true) {
+                String encryptedData = decodeData.encrypt(requestId, logCategory, deviceId, response.getData());
+                response.setData(encryptedData);
+                log.info("<===========================  response raw for requestId: " + requestId + " => " + new Gson().toJson(response));
+            }
+
+        }
+    }
+
+
 
 
 

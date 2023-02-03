@@ -14,10 +14,12 @@ import com.epay.ewallet.service.admin.payloads.request.GetListPostFilterRequest;
 import com.epay.ewallet.service.admin.payloads.response.CommonResponse;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mongodb.client.*;
+import com.mongodb.client.result.InsertOneResult;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.bson.Document;
 import org.bson.conversions.Bson;
+import org.hibernate.sql.Update;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Repository;
@@ -344,46 +346,118 @@ public class AdminRepositoryNative {
 
     public long approve_reject_post(ApproveRejectPostRequest request, User user) {
 
-        try{
+        try {
 
             MongoDatabase database = mongoClient.getDatabase(db);
             MongoCollection<Document> collection = database.getCollection("posts");
 
-            if(request.getFlag().equalsIgnoreCase("APPROVE")){
+            if (request.getFlag().equalsIgnoreCase("APPROVE")) {
                 //approve post
 
                 ArrayList<Bson> arrL = new ArrayList<>();
-                Bson status = Updates.set("status","ACTIVE");
-                Bson byAdmin = Updates.set("byadmin",user.getName());
+                Bson status = Updates.set("status", "ACTIVE");
+                Bson byAdmin = Updates.set("byadmin", user.getName());
                 arrL.add(status);
                 arrL.add(byAdmin);
 
-                UpdateResult updateResult  = collection.updateOne(Filters.eq("_id",request.getPostId()),arrL);
-                log.info( " => getMatchedCount: " + updateResult.getMatchedCount() + ",getModifiedCount: " + updateResult.getModifiedCount());
+                UpdateResult updateResult = collection.updateOne(Filters.eq("_id", request.getPostId()), arrL);
+                log.info(" => getMatchedCount: " + updateResult.getMatchedCount() + ",getModifiedCount: " + updateResult.getModifiedCount());
                 return updateResult.getMatchedCount();
-            }
-            else {
+            } else {
                 //reject post
                 ArrayList<Bson> arrL = new ArrayList<>();
-                Bson status = Updates.set("status","REJECT");
-                Bson byAdmin = Updates.set("byadmin",user.getName());
-                Bson reason = Updates.set("reason",request.getReason());
+                Bson status = Updates.set("status", "REJECT");
+                Bson byAdmin = Updates.set("byadmin", user.getName());
+                Bson reason = Updates.set("reason", request.getReason());
                 arrL.add(status);
                 arrL.add(byAdmin);
-                if(request.getReportType().equalsIgnoreCase("OTHER"))
-                arrL.add(reason);
+                if (request.getReportType().equalsIgnoreCase("OTHER"))
+                    arrL.add(reason);
 
-                UpdateResult updateResult  = collection.updateOne(Filters.eq("_id",request.getPostId()),arrL);
-                log.info( " => getMatchedCount: " + updateResult.getMatchedCount() + ",getModifiedCount: " + updateResult.getModifiedCount());
+                UpdateResult updateResult = collection.updateOne(Filters.eq("_id", request.getPostId()), arrL);
+                log.info(" => getMatchedCount: " + updateResult.getMatchedCount() + ",getModifiedCount: " + updateResult.getModifiedCount());
                 return updateResult.getMatchedCount();
 
             }
-
-        }catch (Exception e){
+        } catch (Exception e) {
             log.info(e.getMessage());
         }
 
+        return 0;
+    }
 
-        return  0;
+
+    public long remove_reported_obj(ApproveRejectPostRequest request, User user) {
+
+        try {
+            MongoDatabase database = mongoClient.getDatabase(db);
+            MongoCollection<Document> collection = database.getCollection("reports");
+            String collectionName = "";
+            int count = 0;
+            UpdateResult updateResult = null;
+
+            //kiem tra object la comment hay post
+            Document report = collection.find(Filters.eq("referenceId", request.getPostId())).first();
+            if (report.get("type", String.class).equalsIgnoreCase("COMMENT")) {
+                collectionName = "comments";
+            } else {
+                collectionName = "posts";
+            }
+
+            collection = database.getCollection(collectionName);
+
+            if (request.getFlag().equalsIgnoreCase("REMOVE")) {
+                //flag = REMOVE
+                updateResult = collection.updateOne(Filters.eq("_id", request.getPostId()), Updates.set("status", "REMOVED"));
+            } else {
+                //flag = REJECT
+                updateResult = collection.updateOne(Filters.eq("_id", request.getPostId()), Updates.set("countReport", 0));
+            }
+            count += updateResult.getMatchedCount();
+
+            //set isRead = 1 tai bang reports
+            collection = database.getCollection("reports");
+            updateResult = collection.updateMany(Filters.eq("referenceId", request.getPostId()), Updates.set("isRead", "1"));
+            count += updateResult.getMatchedCount();
+
+            return count;
+        } catch (Exception e) {
+            log.info(e.getMessage());
+        }
+
+        return 0;
+    }
+
+    public boolean report_obj(ApproveRejectPostRequest request, User user) {
+
+
+        try {
+
+            MongoDatabase database = mongoClient.getDatabase(db);
+            MongoCollection<Document> collection = database.getCollection("reports");
+            String type = request.getPostId().trim().split("_")[0];
+
+            Document document = new Document("content", request.getReason());
+            document.append("report_temp", request.getReportType());
+            document.append("userId", Integer.toString(user.getId()));
+            document.append("referenceId", request.getPostId());
+            if (type.equalsIgnoreCase("comment")) {
+                document.append("type", "COMMENT");
+            } else {
+                document.append("type", "POST");
+            }
+            document.append("status", "1");
+            document.append("isRead", "0");
+            document.append("createDate", new Date());
+
+            InsertOneResult insertOneResult = collection.insertOne(document);
+            if (insertOneResult.getInsertedId() != null) {
+                return true;
+            }
+            return false;
+        } catch (Exception e) {
+            log.info(e.getMessage());
+        }
+        return false;
     }
 }

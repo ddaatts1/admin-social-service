@@ -135,14 +135,6 @@ class AdminServiceImplTest {
         assertEquals(EcodeConstant.ERROR_NOT_ADMIN,response.getEcode());
     }
 
-    @Test
-    public void testGetListPostFilter_PostsNull(){
-
-        GetListPostFilterRequest request = new GetListPostFilterRequest();
-        request.setScope("ALL");
-        request.setFlag("SAVED");
-
-    }
 
 
 }
