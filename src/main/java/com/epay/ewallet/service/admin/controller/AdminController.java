@@ -552,7 +552,7 @@ public class AdminController {
             String token = jwtTokenUtil.getTokenFromBearerToken(bearerToken);
             String phone = jwtTokenUtil.getUsernameFromToken(token);
             User user = userDao.getUserByPhone(phone);
-            log.info("===> APPROVE_REJECT_POST => userDO from DB: " + user);
+            log.info("===> GET_LIST_REPORTS => userDO from DB: " + user);
 
             response = adminService.get_list_reports(getListReportsRequest, user, requestId);
 
@@ -744,6 +744,7 @@ public class AdminController {
         }
     }
 
+
     @RequestMapping(value = "/admin/REPORT_OBJ", method = RequestMethod.POST)
     public CommonResponse<Object> report_obj(@RequestBody JsonNode requestRaw,
                                                       @RequestHeader Map<String, String> header,
@@ -799,10 +800,83 @@ public class AdminController {
                 response.setMessage(ecode.getMessage());
                 response.setP_ecode(ecode.getP_ecode());
                 response.setP_message(ecode.getP_message());
-//                response.setData(assignAdminRequest.getUserIdDest());
+                response.setData(reportObjRequest.getPostId());
             }
 
             log.info("===> REPORT_OBJ => response clear: " + new Gson().toJson(response));
+
+            /**
+             * Encrypt data
+             */
+            if (encrypted == true) {
+                String encryptedData = decodeData.encrypt(requestId, logCategory, deviceId, response.getData());
+                response.setData(encryptedData);
+                log.info("<===========================  response raw for requestId: " + requestId + " => " + new Gson().toJson(response));
+            }
+
+        }
+    }
+
+    @RequestMapping(value = "/admin/APPEAL_POST", method = RequestMethod.POST)
+    public CommonResponse<Object> appeal_post(@RequestBody JsonNode requestRaw,
+                                                      @RequestHeader Map<String, String> header,
+                                                      @RequestParam(required = false, defaultValue = "true") boolean encrypted) {
+
+        String logCategory = "APPEAL_POST";
+        log.info("-=====================> APPEAL_POST" + requestRaw.toString());
+
+        Gson gson = new Gson();
+        String requestId = header.get("requestid");
+        String language = header.get("language");
+        String deviceId = Utils.getDeviceIdFromHeader(header);
+
+        log.info("===> APPEAL_POST => encrypted: " + encrypted + " => requestId: " + requestId + " => request raw from client: " + requestRaw.toString());
+
+
+        AppealPostRequest appealPostRequest = decodeData.getRequest(requestId, logCategory, requestRaw,
+                AppealPostRequest.class, encrypted, deviceId);
+
+        log.info("===========> APPEAL_POST => requestId: " + requestId + " => request clear from client: " + appealPostRequest.toString());
+
+        log.info("{} | {} | Start | header={} | request={} | encrypted={}", requestId, logCategory, gson.toJson(header),
+                gson.toJson(appealPostRequest), encrypted);
+
+        CommonResponse<Object> response = new CommonResponse<>();
+        try {
+            String bearerToken = header.get("authorization");
+            String token = jwtTokenUtil.getTokenFromBearerToken(bearerToken);
+            String phone = jwtTokenUtil.getUsernameFromToken(token);
+            User user = userDao.getUserByPhone(phone);
+            log.info("===> APPEAL_POST => userDO from DB: " + user);
+
+            response = adminService.appeal_post(appealPostRequest, user, requestId);
+
+            // Jump to finally code block before return
+            return response;
+
+        } catch (Exception e) {
+            log.fatal("{} | {} | Exception | error={}", requestId, logCategory, e);
+            e.printStackTrace();
+
+            response.setEcode(EcodeConstant.EXCEPTION);
+
+            // Jump to finally code block before return
+            return response;
+
+        } finally {
+            /**
+             * Actions before return
+             */
+            if (response.getMessage() == null || response.getMessage().isEmpty() == true) {
+                // Set ecode message, p_ecode, p_message
+                Ecode ecode = codeService.getEcode(response.getEcode(), language);
+                response.setMessage(ecode.getMessage());
+                response.setP_ecode(ecode.getP_ecode());
+                response.setP_message(ecode.getP_message());
+//                response.setData(assignAdminRequest.getUserIdDest());
+            }
+
+            log.info("===> APPEAL_POST => response clear: " + new Gson().toJson(response));
 
             /**
              * Encrypt data

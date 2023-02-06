@@ -425,19 +425,19 @@ public class AdminServiceImpl implements AdminService {
         UserGroup userGroup1 = userGroupRepository.findByUserId(Integer.toString(user.getId()), "1");
         if (userGroup1 == null) {
             // tra ve loi approve post is not enable
-            response.setEcode(EcodeConstant.ERROR_NOT_ADMIN);
+            response.setEcode(EcodeConstant.APPROVE_POST_NOT_ENABLE);
             return response;
         } else {
             //check en_admin_approve_post = ON trong bang group_setting
             Groupsetting groupsetting = groupsettingRepository.findBygroupIdAndReferenceId(userGroup1.getGroupId());
             if (groupsetting == null) {
                 // tra ve loi approve post is not enable
-                response.setEcode(EcodeConstant.ERROR_NOT_ADMIN);
+                response.setEcode(EcodeConstant.APPROVE_POST_NOT_ENABLE);
                 return response;
             } else {
                 if (groupsetting.getEn_admin_approve_post().equalsIgnoreCase("OFF")) {
                     // tra ve loi approve post is not enable
-                    response.setEcode(EcodeConstant.ERROR_NOT_ADMIN);
+                    response.setEcode(EcodeConstant.APPROVE_POST_NOT_ENABLE);
                     return response;
                 }
             }
@@ -476,7 +476,7 @@ public class AdminServiceImpl implements AdminService {
 
         //kiem tra quyen admin
         UserGroup userGroup = userGroupRepository.findByUserId(Integer.toString(user.getId()), "1");
-        log.info("Check quyền SupperAdmin");
+        log.info("Check quyền admin");
         if (userGroup != null) {
             if (userGroup.getRoleId() < 2) { //neu user khong phai la  admin
                 response.setEcode(EcodeConstant.ERROR_NOT_ADMIN);
@@ -503,16 +503,31 @@ public class AdminServiceImpl implements AdminService {
     }
 
     @Override
-    public CommonResponse<Object> report_obj(ApproveRejectPostRequest request, User user, String requestId) {
+    public CommonResponse<Object> appeal_post(AppealPostRequest request, User user, String requestId) {
 
 
         CommonResponse<Object> response = new CommonResponse<>();
+        long count  = adminRepositoryNative.appeal_content(request,user);
 
+        if(count == 1){
+            response.setEcode(EcodeConstant.SUCCESS);
+        }
+        else {
+            response.setEcode(EcodeConstant.ERR);
+        }
+        response.setData(request.getPostId());
+        return response;
+    }
+
+    @Override
+    public CommonResponse<Object> report_obj(ApproveRejectPostRequest request, User user, String requestId) {
+
+        CommonResponse<Object> response = new CommonResponse<>();
         //check user role (la admin thi bao loi)
         UserGroup userGroup = userGroupRepository.findByUserId(Integer.toString(user.getId()),"1");
         if(userGroup != null){
             if(userGroup.getRoleId() >=2){
-                response.setEcode(EcodeConstant.ERR);
+                response.setEcode(EcodeConstant.ERROR_IS_ADMIN);
                 return response;
             }
         }
@@ -525,7 +540,7 @@ public class AdminServiceImpl implements AdminService {
             if(posts.isPresent()){
                 if(posts.get().getUserId().equalsIgnoreCase(Integer.toString(user.getId()))){
                     //thong bao user la chu bai viet
-                    response.setEcode(EcodeConstant.ERR);
+                    response.setEcode(EcodeConstant.ERROR_POST_OWNER);
                     return response;
                 }
             }
@@ -535,7 +550,7 @@ public class AdminServiceImpl implements AdminService {
             if(comments.isPresent()){
                 if(comments.get().getUserId().equalsIgnoreCase(Integer.toString(user.getId()))){
                     //thong bao user la chu bai viet
-                    response.setEcode(EcodeConstant.ERR);
+                    response.setEcode(EcodeConstant.ERROR_POST_OWNER);
                     return response;
                 }
             }

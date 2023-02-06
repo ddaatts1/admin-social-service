@@ -8,9 +8,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 import com.epay.ewallet.service.admin.model.*;
-import com.epay.ewallet.service.admin.payloads.request.ApproveRejectPostRequest;
-import com.epay.ewallet.service.admin.payloads.request.AssignAdminRequest;
-import com.epay.ewallet.service.admin.payloads.request.GetListPostFilterRequest;
+import com.epay.ewallet.service.admin.payloads.request.*;
 import com.epay.ewallet.service.admin.payloads.response.CommonResponse;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mongodb.client.*;
@@ -24,7 +22,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Repository;
 
-import com.epay.ewallet.service.admin.payloads.request.OnoffAutoRemoveRequest;
 import com.epay.ewallet.service.admin.service.impl.AdminServiceImpl;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
@@ -428,11 +425,36 @@ public class AdminRepositoryNative {
         return 0;
     }
 
+    public long appeal_content(AppealPostRequest request, User user) {
+
+        try{
+            MongoDatabase database = mongoClient.getDatabase(db);
+            MongoCollection<Document> collection = database.getCollection("appeal_content");
+
+            Document document  = new Document();
+            document.append("postId",request.getPostId());
+            document.append("content",request.getContent());
+            document.append("createDate",new Date());
+            document.append("isRead","0");
+            document.append("reason","");
+
+            InsertOneResult insertOneResult = collection.insertOne(document);
+        return insertOneResult.getInsertedId() != null? 1:0;
+
+        }catch (Exception e){
+            log.info(e.getMessage());
+        }
+
+
+
+        return 0;
+    }
+
+
+
     public boolean report_obj(ApproveRejectPostRequest request, User user) {
 
-
         try {
-
             MongoDatabase database = mongoClient.getDatabase(db);
             MongoCollection<Document> collection = database.getCollection("reports");
             String type = request.getPostId().trim().split("_")[0];
@@ -460,4 +482,7 @@ public class AdminRepositoryNative {
         }
         return false;
     }
+
+
+
 }
