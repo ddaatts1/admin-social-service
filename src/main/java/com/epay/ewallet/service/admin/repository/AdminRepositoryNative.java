@@ -1,10 +1,9 @@
 package com.epay.ewallet.service.admin.repository;
 
+import java.math.BigInteger;
+import java.security.SecureRandom;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.List;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import com.epay.ewallet.service.admin.model.*;
@@ -427,29 +426,31 @@ public class AdminRepositoryNative {
 
     public long appeal_content(AppealPostRequest request, User user) {
 
-        try{
+        try {
             MongoDatabase database = mongoClient.getDatabase(db);
             MongoCollection<Document> collection = database.getCollection("appeal_content");
 
-            Document document  = new Document();
-            document.append("postId",request.getPostId());
-            document.append("content",request.getContent());
-            document.append("createDate",new Date());
-            document.append("isRead","0");
-            document.append("reason","");
+            SecureRandom random = new SecureRandom();
+            String id = "appeal_" + new BigInteger(130, random).toString(16);
+
+            Document document = new Document();
+            document.append("_id",id);
+            document.append("postId", request.getPostId());
+            document.append("content", request.getContent());
+            document.append("createDate", new Date());
+            document.append("isRead", "0");
+            document.append("reason", "");
 
             InsertOneResult insertOneResult = collection.insertOne(document);
-        return insertOneResult.getInsertedId() != null? 1:0;
+            return insertOneResult.getInsertedId() != null ? 1 : 0;
 
-        }catch (Exception e){
+        } catch (Exception e) {
             log.info(e.getMessage());
         }
 
 
-
         return 0;
     }
-
 
 
     public boolean report_obj(ApproveRejectPostRequest request, User user) {
@@ -484,5 +485,62 @@ public class AdminRepositoryNative {
     }
 
 
+    public boolean approve_appeal(ApproveRejectPostRequest request, User user) {
 
+        try {
+            MongoDatabase database = mongoClient.getDatabase(db);
+            MongoCollection<Document> collection = database.getCollection("appeal_content");
+            Document document = collection.find(Filters.eq("_id",request.getPostId())).first();
+            String postId = document.get("postId",String.class);
+
+            UpdateResult updateResult = null;
+            int count =0;
+
+            collection = database.getCollection("posts");
+            if (request.getFlag().equalsIgnoreCase("APPROVE")) {
+                // flag = APPROVE
+                Bson updateStatus = Updates.set("status", "ACTIVE");
+                Bson updateCountReport = Updates.set("countReport", "0");
+
+                //request.getPostId() = appealId (khong phai id cua post), xem trong  ApproveRejectPostRequest
+                updateResult = collection.updateOne(Filters.eq("_id",postId), Arrays.asList(updateCountReport,updateStatus));
+
+                if(updateResult.getMatchedCount() == 1){
+                    count ++;
+                }
+            } else {
+                //flag = REJECT
+                Bson updateStatus = Updates.set("status", "REJECT");
+                Bson updateReason=null;
+                if(request.getReportType().equalsIgnoreCase("OTHER")){
+                    updateReason = Updates.set("reason",request.getReason());
+                }else {
+                    updateReason = Updates.set("reason",request.getReportType());
+                }
+
+                //request.getPostId() = appealId, xem trong  ApproveRejectPostRequest
+                updateResult = collection.updateOne(Filters.eq("_id",postId), Arrays.asList(updateReason,updateStatus));
+
+                if(updateResult.getMatchedCount() == 1){
+                    count ++;
+                }
+            }
+
+            // update isRead = 1
+            collection = database.getCollection("appeal_content");
+            updateResult = collection.updateOne(Filters.eq("_id",request.getPostId()),Updates.set("isRead","1"));
+            if(updateResult.getMatchedCount() == 1){
+                count++;
+            }
+
+            if(count == 2){
+                return true;
+            }
+
+        } catch (Exception e) {
+            log.info(e.getMessage());
+        }
+
+        return false;
+    }
 }

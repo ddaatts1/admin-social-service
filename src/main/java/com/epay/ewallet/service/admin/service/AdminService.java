@@ -30,4 +30,6 @@ public interface AdminService {
     CommonResponse<Object> appeal_post(AppealPostRequest appealPostRequest, User user, String requestId);
 
 	CommonResponse<Object> report_obj(ApproveRejectPostRequest reportObjRequest, User user, String requestId);
+
+	CommonResponse<Object> approve_appeal(ApproveRejectPostRequest approve_appeal, User user, String requestId);
 }

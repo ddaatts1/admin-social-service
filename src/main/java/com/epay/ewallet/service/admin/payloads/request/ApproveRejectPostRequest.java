@@ -19,6 +19,11 @@ public class ApproveRejectPostRequest {
         this.postId = referenceId;
     }
 
+    @JsonProperty("appealId")
+    public void setAppealId(String appealId) {
+        this.postId = appealId;
+    }
+
     @Override
     public String toString() {
         return "ApproveRejectPostRequest{" +

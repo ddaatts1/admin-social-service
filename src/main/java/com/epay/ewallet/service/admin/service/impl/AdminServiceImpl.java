@@ -39,6 +39,7 @@ public class AdminServiceImpl implements AdminService {
 
     @Autowired
     PostsRepository postsRepository;
+
     public AdminServiceImpl(UserGroupRepository userGroupRepository) {
         this.userGroupRepository = userGroupRepository;
     }
@@ -463,16 +464,16 @@ public class AdminServiceImpl implements AdminService {
         CommonResponse<Object> response = new CommonResponse<>();
 
         //validate
-        if(!Arrays.asList("REMOVE","REJECT").contains(request.getFlag())){
+        if (!Arrays.asList("REMOVE", "REJECT").contains(request.getFlag())) {
             response.setEcode(EcodeConstant.FLAG_NULL_EMPTY);
             return response;
         }
 
-        if(request.getFlag().equalsIgnoreCase("REMOVE"))
-        if(!Arrays.asList("SPAM","BREAK_COM_RULE","FALSENEW","MEM_CONFLICT","OTHER").contains(request.getReportType())){
-            response.setEcode(EcodeConstant.FLAG_NULL_EMPTY);
-            return response;
-        }
+        if (request.getFlag().equalsIgnoreCase("REMOVE"))
+            if (!Arrays.asList("SPAM", "BREAK_COM_RULE", "FALSENEW", "MEM_CONFLICT", "OTHER").contains(request.getReportType())) {
+                response.setEcode(EcodeConstant.FLAG_NULL_EMPTY);
+                return response;
+            }
 
         //kiem tra quyen admin
         UserGroup userGroup = userGroupRepository.findByUserId(Integer.toString(user.getId()), "1");
@@ -487,14 +488,13 @@ public class AdminServiceImpl implements AdminService {
             return response;
         }
 
-        long count =adminRepositoryNative.remove_reported_obj(request,user );
+        long count = adminRepositoryNative.remove_reported_obj(request, user);
 
-        if(count >=2){
+        if (count >= 2) {
             response.setEcode(EcodeConstant.SUCCESS);
             response.setData(request.getPostId());
             return response;
-        }
-        else {
+        } else {
             response.setEcode(EcodeConstant.ERR);
             response.setData(request.getPostId());
             return response;
@@ -507,12 +507,11 @@ public class AdminServiceImpl implements AdminService {
 
 
         CommonResponse<Object> response = new CommonResponse<>();
-        long count  = adminRepositoryNative.appeal_content(request,user);
+        long count = adminRepositoryNative.appeal_content(request, user);
 
-        if(count == 1){
+        if (count == 1) {
             response.setEcode(EcodeConstant.SUCCESS);
-        }
-        else {
+        } else {
             response.setEcode(EcodeConstant.ERR);
         }
         response.setData(request.getPostId());
@@ -524,9 +523,9 @@ public class AdminServiceImpl implements AdminService {
 
         CommonResponse<Object> response = new CommonResponse<>();
         //check user role (la admin thi bao loi)
-        UserGroup userGroup = userGroupRepository.findByUserId(Integer.toString(user.getId()),"1");
-        if(userGroup != null){
-            if(userGroup.getRoleId() >=2){
+        UserGroup userGroup = userGroupRepository.findByUserId(Integer.toString(user.getId()), "1");
+        if (userGroup != null) {
+            if (userGroup.getRoleId() >= 2) {
                 response.setEcode(EcodeConstant.ERROR_IS_ADMIN);
                 return response;
             }
@@ -535,33 +534,76 @@ public class AdminServiceImpl implements AdminService {
         //check user co phai la chu bai viet/comment (neu la chu bai viet thi bao loi)
         String type = null;
         type = request.getPostId().trim().split("_")[0];
-        if(type.equalsIgnoreCase("post")){
-            Optional<Posts> posts =  postsRepository.findById(request.getPostId());
-            if(posts.isPresent()){
-                if(posts.get().getUserId().equalsIgnoreCase(Integer.toString(user.getId()))){
+        if (type.equalsIgnoreCase("post")) {
+            Optional<Posts> posts = postsRepository.findById(request.getPostId());
+            if (posts.isPresent()) {
+                if (posts.get().getUserId().equalsIgnoreCase(Integer.toString(user.getId()))) {
                     //thong bao user la chu bai viet
                     response.setEcode(EcodeConstant.ERROR_POST_OWNER);
                     return response;
                 }
             }
-        }
-        else  if(type.equalsIgnoreCase("comment")){
-            Optional<Comment> comments =  commentRepository.findById(request.getPostId());
-            if(comments.isPresent()){
-                if(comments.get().getUserId().equalsIgnoreCase(Integer.toString(user.getId()))){
+        } else if (type.equalsIgnoreCase("comment")) {
+            Optional<Comment> comments = commentRepository.findById(request.getPostId());
+            if (comments.isPresent()) {
+                if (comments.get().getUserId().equalsIgnoreCase(Integer.toString(user.getId()))) {
                     //thong bao user la chu bai viet
                     response.setEcode(EcodeConstant.ERROR_POST_OWNER);
                     return response;
                 }
             }
-        }
-        else {
+        } else {
             response.setEcode(EcodeConstant.ERR);
             return response;
         }
 
-       boolean flag = adminRepositoryNative.report_obj(request,user);
-        if (flag){
+        boolean flag = adminRepositoryNative.report_obj(request, user);
+        if (flag) {
+            response.setEcode(EcodeConstant.SUCCESS);
+            response.setData(request.getPostId());
+            return response;
+        } else {
+            response.setEcode(EcodeConstant.ERR);
+            response.setData(request.getPostId());
+            return response;
+        }
+
+    }
+
+    @Override
+    public CommonResponse<Object> approve_appeal(ApproveRejectPostRequest request, User user, String requestId) {
+
+        CommonResponse<Object> response = new CommonResponse<>();
+
+        // kiem tra flag
+        if (Arrays.asList("APPROVE","REJECT").contains(request.getFlag())){
+            if(!Arrays.asList("SPAM","BREAK_COM_RULE","FALSENEW","MEM_CONFLICT","OTHER").contains(request.getReportType())){
+                response.setEcode(EcodeConstant.FLAG_NULL_EMPTY);
+                return response;
+            }
+        }else {
+            response.setEcode(EcodeConstant.FLAG_NULL_EMPTY);
+            return response;
+        }
+
+
+        //kiem tra quyen admin
+        UserGroup userGroup = userGroupRepository.findByUserId(Integer.toString(user.getId()), "1");
+        log.info("Check quyền admin");
+        if (userGroup != null) {
+            if (userGroup.getRoleId() < 2) { //neu user khong phai la  admin
+                response.setEcode(EcodeConstant.ERROR_NOT_ADMIN);
+                return response;
+            }
+        } else { //neu user khong phai la  admin
+            response.setEcode(EcodeConstant.ERROR_NOT_ADMIN);
+            return response;
+        }
+
+
+        boolean check = adminRepositoryNative.approve_appeal(request,user);
+
+        if(check){
             response.setEcode(EcodeConstant.SUCCESS);
             response.setData(request.getPostId());
             return response;
