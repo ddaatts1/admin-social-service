@@ -3,9 +3,9 @@ package com.epay.ewallet.service.admin.service.impl;
 import java.util.*;
 import java.util.stream.Collectors;
 
-import com.epay.ewallet.service.admin.constant.Constant;
 import com.epay.ewallet.service.admin.model.*;
 import com.epay.ewallet.service.admin.payloads.request.*;
+import com.epay.ewallet.service.admin.payloads.response.ReportDTO;
 import com.epay.ewallet.service.admin.payloads.response.UserDTO;
 import com.epay.ewallet.service.admin.repository.*;
 import com.epay.ewallet.service.admin.service.UserService;
@@ -288,6 +288,11 @@ public class AdminServiceImpl implements AdminService {
             return response;
         }
 
+        if(!Arrays.asList("USER","ALL").contains(request.getScope())){
+            response.setEcode(EcodeConstant.FLAG_NULL_EMPTY);
+            return response;
+        }
+
 
         //kiem tra quyen admin neu scope = ALL
         if (request.getScope().equalsIgnoreCase("ALL")) {
@@ -309,7 +314,7 @@ public class AdminServiceImpl implements AdminService {
                 return response;
             }
 
-            // neu flag = PENDING, scopr = ALL,
+            // neu flag = PENDING, scope = ALL,
             // check admin do co thuoc group co en_admin_approve_post = ON (trong bang group_setting) hay khong
             if (request.getFlag().equalsIgnoreCase("PENDING")) {
 
@@ -373,7 +378,7 @@ public class AdminServiceImpl implements AdminService {
         if (listTag != null)
             postId_Tags = listTag.stream().collect(Collectors.groupingBy(h -> h.getPostId(), Collectors.toList()));
 
-
+        // set image, user, tags
         for (Posts p : listPosts) {
             if (postId_media.get(p.get_id()) != null) {
                 p.setImages(postId_media.get(p.get_id()));
@@ -383,7 +388,7 @@ public class AdminServiceImpl implements AdminService {
             p.setTags(postId_Tags.get(p.get_id()));
         }
 
-
+        // set data
         response.setData(listPosts);
 
 
@@ -393,8 +398,13 @@ public class AdminServiceImpl implements AdminService {
     @Override
     public CommonResponse<Object> get_list_reports(GetListReportsRequest request, User user, String requestId) {
 
+        CommonResponse<Object> response = new CommonResponse<>();
 
-        return null;
+        ReportDTO reports = adminRepositoryNative.getListReport(request,user);
+
+        response.setData(reports);
+        response.setEcode(EcodeConstant.SUCCESS);
+        return response;
     }
 
     @Override
@@ -571,13 +581,14 @@ public class AdminServiceImpl implements AdminService {
     }
 
     @Override
-    public CommonResponse<Object> approve_appeal(ApproveRejectPostRequest request, User user, String requestId) {
+    public CommonResponse<Object> approve_appeal(ApproveRejectPostRequest request, User user, String requestId, Document action) {
 
         CommonResponse<Object> response = new CommonResponse<>();
 
         // kiem tra flag
         if (Arrays.asList("APPROVE","REJECT").contains(request.getFlag())){
-            if(!Arrays.asList("SPAM","BREAK_COM_RULE","FALSENEW","MEM_CONFLICT","OTHER").contains(request.getReportType())){
+            if(request.getFlag().equalsIgnoreCase("REJECT") &&
+                    !Arrays.asList("SPAM","BREAK_COM_RULE","FALSENEW","MEM_CONFLICT","OTHER").contains(request.getReportType())){
                 response.setEcode(EcodeConstant.FLAG_NULL_EMPTY);
                 return response;
             }
@@ -601,7 +612,7 @@ public class AdminServiceImpl implements AdminService {
         }
 
 
-        boolean check = adminRepositoryNative.approve_appeal(request,user);
+        boolean check = adminRepositoryNative.approve_appeal(request,user,action);
 
         if(check){
             response.setEcode(EcodeConstant.SUCCESS);

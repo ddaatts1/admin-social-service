@@ -3,6 +3,7 @@ package com.epay.ewallet.service.admin.service;
 import com.epay.ewallet.service.admin.model.User;
 import com.epay.ewallet.service.admin.payloads.request.*;
 import com.epay.ewallet.service.admin.payloads.response.CommonResponse;
+import org.bson.Document;
 
 
 public interface AdminService {
@@ -31,5 +32,5 @@ public interface AdminService {
 
 	CommonResponse<Object> report_obj(ApproveRejectPostRequest reportObjRequest, User user, String requestId);
 
-	CommonResponse<Object> approve_appeal(ApproveRejectPostRequest approve_appeal, User user, String requestId);
+	CommonResponse<Object> approve_appeal(ApproveRejectPostRequest approve_appeal, User user, String requestId, Document action);
 }

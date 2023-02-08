@@ -1,6 +1,7 @@
 package com.epay.ewallet.service.admin.controller;
 
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 import java.util.Map;
 
@@ -804,7 +805,6 @@ public class AdminController {
             }
 
             log.info("===> REPORT_OBJ => response clear: " + new Gson().toJson(response));
-
             /**
              * Encrypt data
              */
@@ -922,8 +922,18 @@ public class AdminController {
             User user = userDao.getUserByPhone(phone);
             log.info("===> APPROVE_APPEAL => userDO from DB: " + user);
 
-            response = adminService.approve_appeal(approve_appeal, user, requestId);
+            Document action = new Document();
+            action.append("userId",user.getId());
+            action.append("function_name","APPROVE_APPEAL");
+            ObjectMapper objectMapper = new ObjectMapper();
+            String json = objectMapper.writeValueAsString(approve_appeal);
+            action.append("request_data",Document.parse(json));
+            action.append("occur_date", new Date());
 
+            response = adminService.approve_appeal(approve_appeal, user, requestId,action);
+
+            // insert action_log
+            write_action_log(action);
             // Jump to finally code block before return
             return response;
 
@@ -961,6 +971,15 @@ public class AdminController {
             }
 
         }
+    }
+
+
+
+
+    private void write_action_log(Document action){
+        MongoDatabase database = mongoClient.getDatabase(db);
+        MongoCollection<Document> collection = database.getCollection("action_logs");
+        collection.insertOne(action);
     }
 
 

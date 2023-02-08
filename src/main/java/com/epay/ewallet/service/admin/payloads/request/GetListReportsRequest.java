@@ -4,13 +4,13 @@ import lombok.Data;
 
 @Data
 public class GetListReportsRequest {
-    private String postId;
+    private String objectId;
 
 
     @Override
     public String toString() {
         return "GetListReportsRequest{" +
-                "postId='" + postId + '\'' +
+                "postId='" + objectId + '\'' +
                 '}';
     }
 }

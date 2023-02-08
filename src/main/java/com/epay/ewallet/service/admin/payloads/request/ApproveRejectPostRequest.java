@@ -12,7 +12,7 @@ public class ApproveRejectPostRequest {
     private  String postId;
     private String flag;
     private String reportType;
-    private String reason;
+    private String reason = null;
 
     @JsonProperty("referenceId")
     public void setReferenceId(String referenceId) {

@@ -6,9 +6,11 @@ import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import com.epay.ewallet.service.admin.constant.StatusConstant;
 import com.epay.ewallet.service.admin.model.*;
 import com.epay.ewallet.service.admin.payloads.request.*;
 import com.epay.ewallet.service.admin.payloads.response.CommonResponse;
+import com.epay.ewallet.service.admin.payloads.response.ReportDTO;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mongodb.client.*;
 import com.mongodb.client.result.InsertOneResult;
@@ -40,6 +42,9 @@ public class AdminRepositoryNative {
 
     @Value("${spring.data.mongodb.database_}")
     private String db;
+
+    @Autowired
+    PostsRepository postsRepository;
 
 
     public ArrayList<HashMap<String, String>> getListAdmin(String groupId) {
@@ -246,31 +251,51 @@ public class AdminRepositoryNative {
                 MongoCollection<Document> postsCollection = database.getCollection("posts");
                 MongoIterable<Document> reportedRemovedPosts = null;
                 if (request.getScope().equalsIgnoreCase("ALL")) {
-                    //lay at ca cac post bi report hoac remove cua tat ca user
-                    reportedRemovedPosts = postsCollection.find(Filters.or(
-                            Filters.gt("countReport", 0), Filters.eq("status", "REMOVED")
-                    ));
+                    //lay at ca cac post bi report  cua tat ca user
+                    reportedRemovedPosts = postsCollection.find(Filters.and(
+                            Filters.gt("countReport", 0), Filters.eq("status", StatusConstant.STT_ACTIVE)));
                 } else {
                     //lay at ca cac post bi report hoac remove cua user dang dang nhap
                     reportedRemovedPosts = postsCollection.find(Filters.and(Filters.eq("userId", Integer.toString(user.getId())), Filters.or(
-                            Filters.gt("countReport", 0), Filters.eq("status", "REMOVED"))));
+                            Filters.gt("countReport", 0), Filters.eq("status", StatusConstant.STT_REMOVED), Filters.eq("status", StatusConstant.STT_REVIEWING), Filters.eq("status", StatusConstant.STT_APPEAL_REJECT))));
                 }
 
                 ObjectMapper objectMapper = new ObjectMapper();
                 listPosts = reportedRemovedPosts.map(p -> objectMapper.convertValue(p, Posts.class)).into(new ArrayList<>());
 
-            } else {
-                // neu flag la HIDDEN , PENDING
+            } else if (request.getFlag().equalsIgnoreCase("HIDDEN")) {
+                // neu flag la HIDDEN
                 MongoCollection<Document> postsCollection = database.getCollection("posts");
-                MongoIterable<Document> reportedRemovedPosts = null;
+                MongoIterable<Document> posts = null;
+
                 if (request.getScope().equalsIgnoreCase("ALL")) {
-                    reportedRemovedPosts = postsCollection.find(Filters.eq("status", request.getFlag()));
+                    //scope = ALL
+                    posts = postsCollection.find(Filters.eq("status", request.getFlag()));
                 } else {
-                    reportedRemovedPosts = postsCollection.find(Filters.and(Filters.eq("userId", Integer.toString(user.getId())), Filters.eq("status", request.getFlag())));
+                    //scope = USER
+                    posts = postsCollection.find(Filters.and(Filters.eq("userId", Integer.toString(user.getId())), Filters.eq("status", request.getFlag())));
                 }
+
                 ObjectMapper objectMapper = new ObjectMapper();
-                listPosts = reportedRemovedPosts.map(p -> objectMapper.convertValue(p, Posts.class)).into(new ArrayList<>());
+                listPosts = posts.map(p -> objectMapper.convertValue(p, Posts.class)).into(new ArrayList<>());
+            } else {
+                // neu flag la PENDING
+                MongoCollection<Document> postsCollection = database.getCollection("posts");
+                MongoIterable<Document> posts = null;
+
+                if (request.getScope().equalsIgnoreCase("ALL")) {
+                    //scope = ALL
+                    posts = postsCollection.find(Filters.eq("status", request.getFlag()));
+                } else {
+                    //scope = USER
+                    posts = postsCollection.find(Filters.and(Filters.eq("userId", Integer.toString(user.getId())), Filters.or(Filters.eq("status", request.getFlag()), Filters.eq("status", StatusConstant.STT_REJECT))));
+                }
+
+                ObjectMapper objectMapper = new ObjectMapper();
+                listPosts = posts.map(p -> objectMapper.convertValue(p, Posts.class)).into(new ArrayList<>());
+
             }
+
 
             return listPosts;
 
@@ -351,7 +376,7 @@ public class AdminRepositoryNative {
                 //approve post
 
                 ArrayList<Bson> arrL = new ArrayList<>();
-                Bson status = Updates.set("status", "ACTIVE");
+                Bson status = Updates.set("status", StatusConstant.STT_ACTIVE);
                 Bson byAdmin = Updates.set("byadmin", user.getName());
                 arrL.add(status);
                 arrL.add(byAdmin);
@@ -362,7 +387,7 @@ public class AdminRepositoryNative {
             } else {
                 //reject post
                 ArrayList<Bson> arrL = new ArrayList<>();
-                Bson status = Updates.set("status", "REJECT");
+                Bson status = Updates.set("status", StatusConstant.STT_REJECT);
                 Bson byAdmin = Updates.set("byadmin", user.getName());
                 Bson reason = Updates.set("reason", request.getReason());
                 arrL.add(status);
@@ -402,9 +427,9 @@ public class AdminRepositoryNative {
 
             collection = database.getCollection(collectionName);
 
-            if (request.getFlag().equalsIgnoreCase("REMOVE")) {
+            if (request.getFlag().equalsIgnoreCase(StatusConstant.STT_REMOVED)) {
                 //flag = REMOVE
-                updateResult = collection.updateOne(Filters.eq("_id", request.getPostId()), Updates.set("status", "REMOVED"));
+                updateResult = collection.updateOne(Filters.eq("_id", request.getPostId()), Updates.set("status", StatusConstant.STT_REMOVED));
             } else {
                 //flag = REJECT
                 updateResult = collection.updateOne(Filters.eq("_id", request.getPostId()), Updates.set("countReport", 0));
@@ -429,12 +454,12 @@ public class AdminRepositoryNative {
         try {
             MongoDatabase database = mongoClient.getDatabase(db);
             MongoCollection<Document> collection = database.getCollection("appeal_content");
-
+            // tao ban ghi moi tai bang appeal_content
             SecureRandom random = new SecureRandom();
             String id = "appeal_" + new BigInteger(130, random).toString(16);
 
             Document document = new Document();
-            document.append("_id",id);
+            document.append("_id", id);
             document.append("postId", request.getPostId());
             document.append("content", request.getContent());
             document.append("createDate", new Date());
@@ -442,7 +467,13 @@ public class AdminRepositoryNative {
             document.append("reason", "");
 
             InsertOneResult insertOneResult = collection.insertOne(document);
-            return insertOneResult.getInsertedId() != null ? 1 : 0;
+
+            // update status trong bang posts la REVIEWING
+            collection = database.getCollection("posts");
+            UpdateResult updateResult = collection.updateOne(Filters.eq("_id", request.getPostId()), Updates.set("status", StatusConstant.STT_REVIEWING));
+
+
+            return insertOneResult.getInsertedId() != null && updateResult.getMatchedCount() == 1 ? 1 : 0;
 
         } catch (Exception e) {
             log.info(e.getMessage());
@@ -459,22 +490,45 @@ public class AdminRepositoryNative {
             MongoDatabase database = mongoClient.getDatabase(db);
             MongoCollection<Document> collection = database.getCollection("reports");
             String type = request.getPostId().trim().split("_")[0];
+            String collectionName =null;
+
+            SecureRandom random = new SecureRandom();
+            String id = "report_" + new BigInteger(130, random).toString(16);
 
             Document document = new Document("content", request.getReason());
+            document.append("_id",id);
             document.append("report_temp", request.getReportType());
             document.append("userId", Integer.toString(user.getId()));
             document.append("referenceId", request.getPostId());
             if (type.equalsIgnoreCase("comment")) {
                 document.append("type", "COMMENT");
+                collectionName = "comments";
             } else {
                 document.append("type", "POST");
+                collectionName = "posts";
             }
             document.append("status", "1");
             document.append("isRead", "0");
             document.append("createDate", new Date());
 
+            // insert one vao bang "reports"
             InsertOneResult insertOneResult = collection.insertOne(document);
-            if (insertOneResult.getInsertedId() != null) {
+            if (insertOneResult.getInsertedId() == null) {
+                return false;
+            }
+
+            UpdateResult updateResult = null;
+            // update countreport trong bang "comments" hoac "posts"
+            if(collectionName.equalsIgnoreCase("comments")){
+                collection = database.getCollection("comments");
+               updateResult=  collection.updateOne(Filters.eq("_id",request.getPostId()),Updates.inc("countReport",1));
+            }
+            else {
+                collection = database.getCollection("posts");
+                updateResult = collection.updateOne(Filters.eq("_id",request.getPostId()),Updates.inc("countReport",1));
+            }
+
+            if(updateResult.getMatchedCount() == 1){
                 return true;
             }
             return false;
@@ -485,55 +539,75 @@ public class AdminRepositoryNative {
     }
 
 
-    public boolean approve_appeal(ApproveRejectPostRequest request, User user) {
+    public boolean approve_appeal(ApproveRejectPostRequest request, User user, Document action) {
 
         try {
             MongoDatabase database = mongoClient.getDatabase(db);
             MongoCollection<Document> collection = database.getCollection("appeal_content");
-            Document document = collection.find(Filters.eq("_id",request.getPostId())).first();
-            String postId = document.get("postId",String.class);
-
+            //request.getPostId() = appealId (khong phai id cua post), xem trong  ApproveRejectPostRequest
+            Document document = collection.find(Filters.eq("_id", request.getPostId())).first();
+            String postId = document.get("postId", String.class);
             UpdateResult updateResult = null;
-            int count =0;
+            int count = 0;
 
             collection = database.getCollection("posts");
             if (request.getFlag().equalsIgnoreCase("APPROVE")) {
                 // flag = APPROVE
-                Bson updateStatus = Updates.set("status", "ACTIVE");
+                Bson updateStatus = Updates.set("status", StatusConstant.STT_ACTIVE);
                 Bson updateCountReport = Updates.set("countReport", "0");
 
-                //request.getPostId() = appealId (khong phai id cua post), xem trong  ApproveRejectPostRequest
-                updateResult = collection.updateOne(Filters.eq("_id",postId), Arrays.asList(updateCountReport,updateStatus));
+                updateResult = collection.updateOne(Filters.eq("_id", postId), Arrays.asList(updateCountReport, updateStatus));
+                action.append("action1", new Document().
+                        append("type", "update").
+                        append("update_content", new Document().append("status", StatusConstant.STT_ACTIVE).
+                                append("countReport", "0")));
 
-                if(updateResult.getMatchedCount() == 1){
-                    count ++;
+                if (updateResult.getMatchedCount() == 1) {
+                    count++;
                 }
             } else {
                 //flag = REJECT
-                Bson updateStatus = Updates.set("status", "REJECT");
-                Bson updateReason=null;
-                if(request.getReportType().equalsIgnoreCase("OTHER")){
-                    updateReason = Updates.set("reason",request.getReason());
-                }else {
-                    updateReason = Updates.set("reason",request.getReportType());
-                }
-
+                Bson updateStatus = Updates.set("status", StatusConstant.STT_APPEAL_REJECT);
                 //request.getPostId() = appealId, xem trong  ApproveRejectPostRequest
-                updateResult = collection.updateOne(Filters.eq("_id",postId), Arrays.asList(updateReason,updateStatus));
-
-                if(updateResult.getMatchedCount() == 1){
-                    count ++;
+                updateResult = collection.updateOne(Filters.eq("_id", postId), updateStatus);
+                action.append("action1", new Document().append("postId", postId).append("collection", "posts").append("type", "update").append("update_content",new Document().append("status", StatusConstant.STT_APPEAL_REJECT)));
+                if (updateResult.getMatchedCount() == 1) {
+                    count++;
                 }
             }
 
             // update isRead = 1
             collection = database.getCollection("appeal_content");
-            updateResult = collection.updateOne(Filters.eq("_id",request.getPostId()),Updates.set("isRead","1"));
-            if(updateResult.getMatchedCount() == 1){
+            Bson updateReason = null;
+            List<Bson> update = new ArrayList<>();
+            Bson updateIsRead = Updates.set("isRead", "1");
+            update.add(updateIsRead);
+
+            if (request.getFlag().equalsIgnoreCase(StatusConstant.STT_REJECT)) {
+                if (request.getReportType().equalsIgnoreCase("OTHER")) {
+                    updateReason = Updates.set("reason", request.getReason());
+                    action.append("action2", new Document().
+                            append("appealId", request.getPostId()).
+                            append("collection", "appeal_content").
+                            append("type", "update").append("isRead", "1").
+                            append("reason", request.getReason()));
+                } else {
+                    updateReason = Updates.set("reason", request.getReportType());
+                    action.append("action2", new Document().
+                            append("appealId", request.getPostId()).
+                            append("collection", "appeal_content").
+                            append("type", "update").append("isRead", "1").
+                            append("reason", request.getReportType()));
+                }
+                update.add(updateReason);
+            }
+
+            updateResult = collection.updateOne(Filters.eq("_id", request.getPostId()), update);
+            if (updateResult.getMatchedCount() == 1) {
                 count++;
             }
 
-            if(count == 2){
+            if (count == 2) {
                 return true;
             }
 
@@ -542,5 +616,81 @@ public class AdminRepositoryNative {
         }
 
         return false;
+    }
+
+    public ReportDTO getListReport(GetListReportsRequest request, User user) {
+
+        List<ReportDTO> reports = new ArrayList<>();
+
+        MongoDatabase database = mongoClient.getDatabase(db);
+        MongoCollection<Document> collection = database.getCollection("reports");
+
+        FindIterable<Document> iterable = collection.find(Filters.eq("referenceId", request.getObjectId()));
+        MongoCursor<Document> cursor = iterable.cursor();
+
+        int spam = 0;
+        int falseNew = 0;
+        int memberConflict = 0;
+        int breakCompanyRule = 0;
+        List<String> reasons = new ArrayList<>();
+        String type = null;
+        Document document = null;
+        boolean flag = true;
+
+        while (cursor.hasNext()) {
+            document = cursor.next();
+
+            if (flag) {
+                type = document.get("type", String.class);
+                flag = false;
+            }
+            switch (document.get("report_temp", String.class)) {
+                case "SPAM":
+                    spam++;
+                    break;
+                case "FALSENEW":
+                    falseNew++;
+                    break;
+                case "MEM_CONFLICT":
+                    memberConflict++;
+                    break;
+                case "BREAK_COM_RULE":
+                    breakCompanyRule++;
+                    break;
+                case "OTHER":
+                    reasons.add(document.get("content", String.class));
+                    break;
+            }
+        }
+        ReportDTO reportDTO = new ReportDTO();
+        reportDTO.setReportReason(reasons);
+        reportDTO.setBreaksCompanyRule(breakCompanyRule);
+        reportDTO.setFalseNew(falseNew);
+        reportDTO.setSpam(spam);
+        reportDTO.setMemberConflict(memberConflict);
+
+        //neu la post
+        if (type.equalsIgnoreCase("POST")) {
+            Optional<Posts> optional = postsRepository.findById(request.getObjectId());
+            Posts posts = optional.isPresent() ? optional.get() : null;
+            if (posts != null) {
+                reportDTO.setPostStatus(posts.getStatus());
+                if (reportDTO.getPostStatus().equalsIgnoreCase(StatusConstant.STT_REVIEWING)) {
+                    //neu status la REVIEWING, lay noi dung khang cao tu bang appeal_content
+                    collection = database.getCollection("appeal_content");
+                    Document appeal = collection.find(Filters.eq("postId", request.getObjectId())).first();
+                    reportDTO.setAppealReason(appeal.get("content", String.class));
+
+                } else if (reportDTO.getPostStatus().equalsIgnoreCase(StatusConstant.STT_APPEAL_REJECT)) {
+                    // neu status la APPEAL_REJECT, lay noi dung reject tu bang posts
+                    collection = database.getCollection("posts");
+                    Document document1 = collection.find(Filters.eq("_id", request.getObjectId())).first();
+                    reportDTO.setRejectReason(document1.get("reason", String.class));
+                }
+            }
+
+        }
+
+        return reportDTO;
     }
 }
