@@ -22,4 +22,8 @@ public class EcodeConstant {
 	public static String REF_ID_NULL_EMPTY = "1001";
 	public static String REACT_TYPE_NULL_EMPTY = "1002";
 	public static String TYPE_NULL_EMPTY = "1003";
+	public static String INVALID_USER ="1020";
+	public static String APPROVE_POST_NOT_ENABLE ="1044";
+	public static String ERROR_IS_ADMIN ="1045";
+	public static String ERROR_POST_OWNER="1046";
 }
