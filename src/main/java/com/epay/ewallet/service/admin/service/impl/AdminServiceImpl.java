@@ -3,10 +3,10 @@ package com.epay.ewallet.service.admin.service.impl;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import com.epay.ewallet.service.admin.constant.Constant;
 import com.epay.ewallet.service.admin.model.*;
 import com.epay.ewallet.service.admin.payloads.request.*;
-import com.epay.ewallet.service.admin.payloads.response.ReportDTO;
-import com.epay.ewallet.service.admin.payloads.response.UserDTO;
+import com.epay.ewallet.service.admin.payloads.response.*;
 import com.epay.ewallet.service.admin.repository.*;
 import com.epay.ewallet.service.admin.service.UserService;
 import org.apache.logging.log4j.LogManager;
@@ -16,7 +16,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import com.epay.ewallet.service.admin.constant.EcodeConstant;
-import com.epay.ewallet.service.admin.payloads.response.CommonResponse;
 import com.epay.ewallet.service.admin.service.AdminService;
 import com.epay.ewallet.service.admin.service.CodeService;
 
@@ -61,7 +60,6 @@ public class AdminServiceImpl implements AdminService {
 //		LinkedHashMap<String, Object> data = new LinkedHashMap<>();
 
         log.info("Approve post service start.......");
-
         response.setEcode(EcodeConstant.SUCCESS);
         response.setMessage(EcodeConstant.SUCCESS_MSG);
         response.setP_ecode(EcodeConstant.SUCCESS);
@@ -201,11 +199,19 @@ public class AdminServiceImpl implements AdminService {
 
         log.info("assign admin service start .....");
 
+        // kiem tra role id cua user trong bangr user_group neu co
+        UserGroup userDestGroup = userGroupRepository.findByUserId(request.getUserIdDest(),"1");
+        if(userDestGroup != null){
+            if(userDestGroup.getRoleId() == 3){
+                response.setEcode(EcodeConstant.ERR);
+                return  response;
+            }
+        }
 
         UserGroup userGroup = userGroupRepository.findByUserId(Integer.toString(user.getId()), "1");
         log.info("Check quyền SupperAdmin");
         if (userGroup != null) {
-            if (userGroup.getRoleId() < 3) { //neu user khong phai la super admin
+            if (userGroup.getRoleId() != Constant.IS_SUPER_ADMIN) { //neu user khong phai la super admin
                 response.setEcode(EcodeConstant.ERROR_NOT_ADMIN);
 //				data.put("result", false);
 //				response.setData(data);
@@ -221,12 +227,13 @@ public class AdminServiceImpl implements AdminService {
 
         long count = adminRepositoryNative.assignAdmin(request);
 
-        if (count > 0) { //
+        if (count > 0) {
+            // bo nhiem hoac mien nhiem  thanh cong
             response.setEcode(EcodeConstant.SUCCESS);
         } else {
+            // that bai
             response.setEcode(EcodeConstant.ERR);
         }
-
 
         return response;
     }
@@ -237,9 +244,9 @@ public class AdminServiceImpl implements AdminService {
         CommonResponse<Object> response = new CommonResponse<>();
 
         UserGroup userGroup = userGroupRepository.findByUserId(Integer.toString(user.getId()), "1");
-        log.info("Check quyền SupperAdmin");
+        log.info("Check quyen superadmin");
         if (userGroup != null) {
-            if (userGroup.getRoleId() < 3) { //neu user khong phai la super admin
+            if (userGroup.getRoleId() != Constant.IS_SUPER_ADMIN) { //neu user khong phai la super admin
                 response.setEcode(EcodeConstant.ERROR_NOT_ADMIN);
 //				data.put("result", false);
 //				response.setData(data);
@@ -254,7 +261,7 @@ public class AdminServiceImpl implements AdminService {
 
         // kiem tra xem user duoc nhuong quyen co phai la admin
         UserGroup checkadmin = userGroupRepository.findByUserId(request.getUserIdDest(), "1");
-        if (checkadmin == null || checkadmin.getRoleId() != 2) {
+        if (checkadmin == null || checkadmin.getRoleId() != Constant.IS_ADMIN) {
             response.setEcode(EcodeConstant.INVALID_USER);
             return response;
         }
@@ -262,12 +269,14 @@ public class AdminServiceImpl implements AdminService {
 
         long count = adminRepositoryNative.assignSuperAdmin(request, userGroup);
 
+
         if (count == 2) {
+        // update thanh cong
             response.setEcode(EcodeConstant.SUCCESS);
         } else {
+            // update that bai
             response.setEcode(EcodeConstant.ERR);
         }
-
 
         return response;
     }
@@ -301,7 +310,7 @@ public class AdminServiceImpl implements AdminService {
             log.info("Check quyền admin: " + user.getId());
 
             if (userGroup != null) {
-                if (userGroup.getRoleId() < 2) { //neu user khong phai la  admin
+                if (userGroup.getRoleId() < Constant.IS_ADMIN) { //neu user khong phai la  admin
                     response.setEcode(EcodeConstant.ERROR_NOT_ADMIN);
 //				data.put("result", false);
 //				response.setData(data);
@@ -321,7 +330,7 @@ public class AdminServiceImpl implements AdminService {
                 //check user do thuoc group nao
                 UserGroup userGroup1 = userGroupRepository.findByUserId(Integer.toString(user.getId()), "1");
                 if (userGroup1 == null) {
-                    // tra ve loi approve post is not enable
+                    // tra ve loi user khong phai admin
                     response.setEcode(EcodeConstant.ERROR_NOT_ADMIN);
                     return response;
                 } else {
@@ -329,12 +338,12 @@ public class AdminServiceImpl implements AdminService {
                     Groupsetting groupsetting = groupsettingRepository.findBygroupIdAndReferenceId(userGroup1.getGroupId());
                     if (groupsetting == null) {
                         // tra ve loi approve post is not enable
-                        response.setEcode(EcodeConstant.ERROR_NOT_ADMIN);
+                        response.setEcode(EcodeConstant.APPROVE_POST_NOT_ENABLE);
                         return response;
                     } else {
                         if (groupsetting.getEn_admin_approve_post().equalsIgnoreCase("OFF")) {
                             // tra ve loi approve post is not enable
-                            response.setEcode(EcodeConstant.ERROR_NOT_ADMIN);
+                            response.setEcode(EcodeConstant.APPROVE_POST_NOT_ENABLE);
                             return response;
                         }
                     }
@@ -342,6 +351,7 @@ public class AdminServiceImpl implements AdminService {
             }
         }
 
+        // fetch data
         List<Posts> listPosts = adminRepositoryNative.getListPostFilter(request, user);
 
         if (listPosts.size() == 0) {
@@ -351,10 +361,13 @@ public class AdminServiceImpl implements AdminService {
         } else {
             response.setEcode(EcodeConstant.SUCCESS);
         }
+
         //lay danh sach userid tuong ung voi  moi post
         List<String> userIds = listPosts.stream().map(p -> p.getUserId()).collect(Collectors.toList());
 
         // fetch user, hashtag, tag va image de them vao post
+
+        // type
 
         //image
         List<Document> listMedia = adminRepositoryNative.getListMediaByListPosts(listPosts);
@@ -378,20 +391,27 @@ public class AdminServiceImpl implements AdminService {
         if (listTag != null)
             postId_Tags = listTag.stream().collect(Collectors.groupingBy(h -> h.getPostId(), Collectors.toList()));
 
+        List<PostDTO> postDTOList  = new ArrayList<>();
+        postDTOList = listPosts.stream().map(p->new PostDTO(p)).collect(Collectors.toList());
+
         // set image, user, tags
-        for (Posts p : listPosts) {
-            if (postId_media.get(p.get_id()) != null) {
-                p.setImages(postId_media.get(p.get_id()));
+        for (PostDTO p : postDTOList) {
+            if (postId_media.get(p.getPostId()) != null) {
+                p.setImages(postId_media.get(p.getPostId()));
             }
+
             p.setUser(userId_UserDTO.get(p.getUserId()));
-            p.setHashTags(postId_HashTags.get(p.get_id()));
-            p.setTags(postId_Tags.get(p.get_id()));
+            p.setHashTags(postId_HashTags.get(p.getPostId()));
+            p.setTagList(postId_Tags.get(p.getPostId()));
         }
 
+        GetListPostFilterDTO data = new GetListPostFilterDTO(postDTOList);
+
+        // neu flag = REPORTED_REMOVED, fet du lieu tu bang comment
+        List<Comment> listComment = adminRepositoryNative.getListCommentFilter(request,user);
+        data.setListComment(listComment);
         // set data
-        response.setData(listPosts);
-
-
+        response.setData(data);
         return response;
     }
 

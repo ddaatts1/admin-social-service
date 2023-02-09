@@ -296,13 +296,14 @@ public class AdminController {
         }
     }
 
+    // Bổ nhiệm hoặc miễn nhiệm admin
     @RequestMapping(value = "/admin/ASSIGN_ADMIN", method = RequestMethod.POST)
     public CommonResponse<Object> assignAdmin(@RequestBody JsonNode requestRaw,
                                               @RequestHeader Map<String, String> header,
                                               @RequestParam(required = false, defaultValue = "true") boolean encrypted) {
 
         String logCategory = "ASSIGN_ADMIN";
-        log.info("-=====================> ASSIGN_ADMIN" + requestRaw.toString());
+//        log.info("-=====================> ASSIGN_ADMIN: " + requestRaw.toString());
 
         Gson gson = new Gson();
         String requestId = header.get("requestid");
@@ -328,8 +329,19 @@ public class AdminController {
             User user = userDao.getUserByPhone(phone);
             log.info("===> ASSIGN_ADMIN => userDO from DB: " + user);
 
+            // set action_log
+            Document action = new Document();
+            action.append("userId",user.getId());
+            action.append("function_name","ASSIGN_ADMIN");
+            ObjectMapper objectMapper = new ObjectMapper();
+            String json = objectMapper.writeValueAsString(assignAdminRequest);
+            action.append("request_data",Document.parse(json));
+            action.append("occur_date", new Date());
+
             response = adminService.assign_admin(assignAdminRequest, user, requestId);
 
+            //insert action log
+            write_action_log(action);
             // Jump to finally code block before return
             return response;
 
@@ -355,7 +367,7 @@ public class AdminController {
                 response.setData(assignAdminRequest.getUserIdDest());
             }
 
-            log.info("===> LIST_ADMIN => response clear: " + new Gson().toJson(response));
+            log.info("===> ASSIGN_ADMIN => response clear: " + new Gson().toJson(response));
 
             /**
              * Encrypt data
@@ -370,14 +382,14 @@ public class AdminController {
 
 
     }
-
+    // Nhượng quyền superadmin
     @RequestMapping(value = "/admin/ASSIGN_SUPERADMIN", method = RequestMethod.POST)
     public CommonResponse<Object> assignSuperAdmin(@RequestBody JsonNode requestRaw,
                                                    @RequestHeader Map<String, String> header,
                                                    @RequestParam(required = false, defaultValue = "true") boolean encrypted) {
 
         String logCategory = "ASSIGN_SUPERADMIN";
-        log.info("-=====================> ASSIGN_SUPERADMIN" + requestRaw.toString());
+//        log.info("-=====================> ASSIGN_SUPERADMIN: " + requestRaw.toString());
 
         Gson gson = new Gson();
         String requestId = header.get("requestid");
@@ -403,7 +415,19 @@ public class AdminController {
             User user = userDao.getUserByPhone(phone);
             log.info("===> ASSIGN_SUPERADMIN => userDO from DB: " + user);
 
+            // set action_log
+            Document action = new Document();
+            action.append("userId",user.getId());
+            action.append("function_name","ASSIGN_SUPERADMIN");
+            ObjectMapper objectMapper = new ObjectMapper();
+            String json = objectMapper.writeValueAsString(assignAdminRequest);
+            action.append("request_data",Document.parse(json));
+            action.append("occur_date", new Date());
+
             response = adminService.assign_superadmin(assignAdminRequest, user, requestId);
+
+            // insert action log
+            write_action_log(action);
 
             // Jump to finally code block before return
             return response;
@@ -430,7 +454,7 @@ public class AdminController {
                 response.setData(assignAdminRequest.getUserIdDest());
             }
 
-            log.info("===> LIST_ADMIN => response clear: " + new Gson().toJson(response));
+            log.info("===> ASSIGN_SUPERADMIN => response clear: " + new Gson().toJson(response));
 
             /**
              * Encrypt data
@@ -445,7 +469,8 @@ public class AdminController {
 
     }
 
-    //
+    //Lấy danh sách các bài viết được save, report, hidden, đợi duyệt bởi admin của
+    //user đang đăng nhập, hoặc của tất cả các user
     @RequestMapping(value = "/admin/GET_LIST_POST_FILTER", method = RequestMethod.GET)
     public CommonResponse<Object> getListPostFilter(@RequestBody JsonNode requestRaw,
                                                     @RequestHeader Map<String, String> header,
@@ -453,7 +478,7 @@ public class AdminController {
 
 
         String logCategory = "GET_LIST_POST_FILTER";
-        log.info("-=====================> GET_LIST_POST_FILTER" + requestRaw.toString());
+//        log.info("-=====================> GET_LIST_POST_FILTER" + requestRaw.toString());
 
         Gson gson = new Gson();
         String requestId = header.get("requestid");
@@ -630,8 +655,19 @@ public class AdminController {
             User user = userDao.getUserByPhone(phone);
             log.info("===> APPROVE_REJECT_POST => userDO from DB: " + user);
 
+            // set action_log
+            Document action = new Document();
+            action.append("userId",user.getId());
+            action.append("function_name","APPROVE_REJECT_POST");
+            ObjectMapper objectMapper = new ObjectMapper();
+            String json = objectMapper.writeValueAsString(approveRejectPostRequest);
+            action.append("request_data",Document.parse(json));
+            action.append("occur_date", new Date());
+
             response = adminService.approve_reject_post(approveRejectPostRequest, user, requestId);
 
+            // insert action log
+            write_action_log(action);
             // Jump to finally code block before return
             return response;
 
@@ -704,8 +740,19 @@ public class AdminController {
             User user = userDao.getUserByPhone(phone);
             log.info("===> REMOVE_REPORTED_OBJ => userDO from DB: " + user);
 
+            // set action_log
+            Document action = new Document();
+            action.append("userId",user.getId());
+            action.append("function_name","REMOVE_REPORTED_OBJ");
+            ObjectMapper objectMapper = new ObjectMapper();
+            String json = objectMapper.writeValueAsString(approveRejectPostRequest);
+            action.append("request_data",Document.parse(json));
+            action.append("occur_date", new Date());
+
             response = adminService.remove_reported_obj(approveRejectPostRequest, user, requestId);
 
+            // insert action_log
+            write_action_log(action);
             // Jump to finally code block before return
             return response;
 
@@ -777,8 +824,19 @@ public class AdminController {
             User user = userDao.getUserByPhone(phone);
             log.info("===> REPORT_OBJ => userDO from DB: " + user);
 
+            // set action_log
+            Document action = new Document();
+            action.append("userId",user.getId());
+            action.append("function_name","REPORT_OBJ");
+            ObjectMapper objectMapper = new ObjectMapper();
+            String json = objectMapper.writeValueAsString(reportObjRequest);
+            action.append("request_data",Document.parse(json));
+            action.append("occur_date", new Date());
+
             response = adminService.report_obj(reportObjRequest, user, requestId);
 
+            // insert action log
+            write_action_log(action);
             // Jump to finally code block before return
             return response;
 
@@ -849,8 +907,19 @@ public class AdminController {
             User user = userDao.getUserByPhone(phone);
             log.info("===> APPEAL_POST => userDO from DB: " + user);
 
+            // set action_log
+            Document action = new Document();
+            action.append("userId",user.getId());
+            action.append("function_name","APPEAL_POST");
+            ObjectMapper objectMapper = new ObjectMapper();
+            String json = objectMapper.writeValueAsString(appealPostRequest);
+            action.append("request_data",Document.parse(json));
+            action.append("occur_date", new Date());
+
             response = adminService.appeal_post(appealPostRequest, user, requestId);
 
+            // insert action log
+            write_action_log(action);
             // Jump to finally code block before return
             return response;
 

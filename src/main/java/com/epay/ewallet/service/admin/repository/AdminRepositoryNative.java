@@ -6,6 +6,7 @@ import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import com.epay.ewallet.service.admin.constant.Constant;
 import com.epay.ewallet.service.admin.constant.StatusConstant;
 import com.epay.ewallet.service.admin.model.*;
 import com.epay.ewallet.service.admin.payloads.request.*;
@@ -45,6 +46,7 @@ public class AdminRepositoryNative {
 
     @Autowired
     PostsRepository postsRepository;
+
 
 
     public ArrayList<HashMap<String, String>> getListAdmin(String groupId) {
@@ -147,23 +149,32 @@ public class AdminRepositoryNative {
             MongoCollection<Document> collection = database.getCollection("user_group");
 
             Document filter = new Document("userId", request.getUserIdDest());
-            long count = collection.countDocuments(filter);
 
+            long count = collection.countDocuments(filter);
 
             if (request.getFlag().equalsIgnoreCase("ON")) {
                 //Bo nhiem admin
                 if (count < 1) {
                     // neu khong tim thay user nao trong collection "user_group"
-
+                    // them ban ghi moi voi roleId = 2
                     Document document = new Document("userId", request.getUserIdDest())
                             .append("groupId", 3)
                             .append("roleId", 2)
                             .append("type", "IN")
                             .append("data", new Date());
-                    collection.insertOne(document);
+                    InsertOneResult insertOneResult = collection.insertOne(document);
+                    if(insertOneResult.getInsertedId() != null){
+                        return 1L;
+                    }
                 }
-                // bo nhiem thanh cong
-                return 1L;
+                else {
+                    // update roleId =2
+                    UpdateResult updateResult = collection.updateOne(Filters.eq("userId",request.getUserIdDest()),Updates.set("roleId","2"));
+                    if(updateResult.getMatchedCount() ==1){
+                        return 1L;
+                    }
+                }
+                return 0L;
 
 
             } else if (request.getFlag().equalsIgnoreCase("OFF")) {
@@ -202,11 +213,11 @@ public class AdminRepositoryNative {
             MongoDatabase database = mongoClient.getDatabase(db);
             MongoCollection<Document> collection = database.getCollection("user_group");
 
-            //update roleid cua admin va superadmin
+            //update roleId cua admin va superadmin
             Bson filterSuperAdmin = Filters.eq("userId", userGroup.getUserId());
             Bson filterAdmin = Filters.eq("userId", request.getUserIdDest());
-            Bson updateAdmin = Updates.set("roleId", 3);
-            Bson updateSuperAdmin = Updates.set("roleId", 2);
+            Bson updateAdmin = Updates.set("roleId", Constant.IS_SUPER_ADMIN);
+            Bson updateSuperAdmin = Updates.set("roleId", Constant.IS_ADMIN);
 
             UpdateResult updateResult1 = collection.updateOne(filterAdmin, updateAdmin);
             UpdateResult updateResult2 = collection.updateOne(filterSuperAdmin, updateSuperAdmin);
@@ -251,11 +262,11 @@ public class AdminRepositoryNative {
                 MongoCollection<Document> postsCollection = database.getCollection("posts");
                 MongoIterable<Document> reportedRemovedPosts = null;
                 if (request.getScope().equalsIgnoreCase("ALL")) {
-                    //lay at ca cac post bi report  cua tat ca user
+                    //lay tat ca cac post bi report  cua tat ca user
                     reportedRemovedPosts = postsCollection.find(Filters.and(
                             Filters.gt("countReport", 0), Filters.eq("status", StatusConstant.STT_ACTIVE)));
                 } else {
-                    //lay at ca cac post bi report hoac remove cua user dang dang nhap
+                    //lay tat ca cac post bi report , remove, reject, appeal reject, hoac dang doi duyet khang cao cua user dang dang nhap
                     reportedRemovedPosts = postsCollection.find(Filters.and(Filters.eq("userId", Integer.toString(user.getId())), Filters.or(
                             Filters.gt("countReport", 0), Filters.eq("status", StatusConstant.STT_REMOVED), Filters.eq("status", StatusConstant.STT_REVIEWING), Filters.eq("status", StatusConstant.STT_APPEAL_REJECT))));
                 }
@@ -692,5 +703,27 @@ public class AdminRepositoryNative {
         }
 
         return reportDTO;
+    }
+
+    public List<Comment> getListCommentFilter(GetListPostFilterRequest request, User user) {
+
+        MongoDatabase database = mongoClient.getDatabase(db);
+        MongoCollection<Document> postsCollection = database.getCollection("comments");
+        MongoIterable<Document> reportedRemovedComments = null;
+        if (request.getScope().equalsIgnoreCase("ALL")) {
+            //lay tat ca cac comment bi report  cua tat ca user
+            reportedRemovedComments = postsCollection.find(Filters.and(
+                    Filters.gt("countReport", 0), Filters.eq("status", StatusConstant.STT_ACTIVE)));
+        } else {
+            //lay tat ca cac comment bi report, remove cua user dang dang nhap
+            reportedRemovedComments = postsCollection.find(Filters.and(Filters.eq("userId", Integer.toString(user.getId())), Filters.or(
+                    Filters.gt("countReport", 0), Filters.eq("status", StatusConstant.STT_REMOVED))));
+        }
+
+        ObjectMapper objectMapper = new ObjectMapper();
+        List<Comment> listComment = new ArrayList<>();
+        listComment = reportedRemovedComments.map(p -> objectMapper.convertValue(p, Comment.class)).into(new ArrayList<>());
+
+        return listComment;
     }
 }
