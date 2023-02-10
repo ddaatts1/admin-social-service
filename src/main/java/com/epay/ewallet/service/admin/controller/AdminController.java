@@ -338,7 +338,7 @@ public class AdminController {
             action.append("request_data",Document.parse(json));
             action.append("occur_date", new Date());
 
-            response = adminService.assign_admin(assignAdminRequest, user, requestId);
+            response = adminService.assign_admin(assignAdminRequest, user, requestId,action);
 
             //insert action log
             write_action_log(action);
@@ -424,7 +424,7 @@ public class AdminController {
             action.append("request_data",Document.parse(json));
             action.append("occur_date", new Date());
 
-            response = adminService.assign_superadmin(assignAdminRequest, user, requestId);
+            response = adminService.assign_superadmin(assignAdminRequest, user, requestId,action);
 
             // insert action log
             write_action_log(action);
@@ -664,7 +664,7 @@ public class AdminController {
             action.append("request_data",Document.parse(json));
             action.append("occur_date", new Date());
 
-            response = adminService.approve_reject_post(approveRejectPostRequest, user, requestId);
+            response = adminService.approve_reject_post(approveRejectPostRequest, user, requestId,action);
 
             // insert action log
             write_action_log(action);
@@ -749,7 +749,7 @@ public class AdminController {
             action.append("request_data",Document.parse(json));
             action.append("occur_date", new Date());
 
-            response = adminService.remove_reported_obj(approveRejectPostRequest, user, requestId);
+            response = adminService.remove_reported_obj(approveRejectPostRequest, user, requestId,action);
 
             // insert action_log
             write_action_log(action);
@@ -833,7 +833,7 @@ public class AdminController {
             action.append("request_data",Document.parse(json));
             action.append("occur_date", new Date());
 
-            response = adminService.report_obj(reportObjRequest, user, requestId);
+            response = adminService.report_obj(reportObjRequest, user, requestId,action);
 
             // insert action log
             write_action_log(action);
@@ -916,7 +916,7 @@ public class AdminController {
             action.append("request_data",Document.parse(json));
             action.append("occur_date", new Date());
 
-            response = adminService.appeal_post(appealPostRequest, user, requestId);
+            response = adminService.appeal_post(appealPostRequest, user, requestId,action);
 
             // insert action log
             write_action_log(action);
