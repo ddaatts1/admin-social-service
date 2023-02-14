@@ -1,5 +1,6 @@
 package com.epay.ewallet.service.admin.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import lombok.Data;
 import org.springframework.data.mongodb.core.mapping.Document;
 
@@ -8,6 +9,7 @@ import java.util.Date;
 
 @Document(collection = "comments")
 @Data
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class Comment {
 
     @Id
@@ -19,5 +21,6 @@ public class Comment {
     private Date createDate;
     private Date editDate;
     private String byRole;
+    private int countReport;
 
 }

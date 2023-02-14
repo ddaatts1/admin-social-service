@@ -22,4 +22,8 @@ public class Constant {
 	public static final String LANGUAGE_VN_7002 = "Bạn vừa đăng nhập bằng thiết bị mới. Bạn sẽ được đăng xuất khỏi ứng dụng";
 	public static final String LANGUAGE_EN_7002 = "A new device has logged in to your wallet. You will be logged out from the application";
 	public static final String LANGUAGE_KR_7002 = "다른 장비에 방금 로그인했습니다. 로그아웃되겠습니다";
+
+	public static final int IS_ADMIN = 2;
+	public static final int IS_SUPER_ADMIN = 3;
+
 }

@@ -6,6 +6,7 @@ import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import com.epay.ewallet.service.admin.constant.Constant;
 import com.epay.ewallet.service.admin.constant.StatusConstant;
 import com.epay.ewallet.service.admin.model.*;
 import com.epay.ewallet.service.admin.payloads.request.*;
@@ -14,6 +15,7 @@ import com.epay.ewallet.service.admin.payloads.response.ReportDTO;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mongodb.client.*;
 import com.mongodb.client.result.InsertOneResult;
+import oracle.jdbc.driver.Const;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.bson.Document;
@@ -45,6 +47,7 @@ public class AdminRepositoryNative {
 
     @Autowired
     PostsRepository postsRepository;
+
 
 
     public ArrayList<HashMap<String, String>> getListAdmin(String groupId) {
@@ -140,30 +143,51 @@ public class AdminRepositoryNative {
     }
 
 
-    public long assignAdmin(AssignAdminRequest request) {
+    public long assignAdmin(AssignAdminRequest request, User user, Document action) {
 
         try {
             MongoDatabase database = mongoClient.getDatabase(db);
             MongoCollection<Document> collection = database.getCollection("user_group");
 
             Document filter = new Document("userId", request.getUserIdDest());
-            long count = collection.countDocuments(filter);
 
+            long count = collection.countDocuments(filter);
 
             if (request.getFlag().equalsIgnoreCase("ON")) {
                 //Bo nhiem admin
                 if (count < 1) {
                     // neu khong tim thay user nao trong collection "user_group"
-
+                    // them ban ghi moi voi roleId = 2
                     Document document = new Document("userId", request.getUserIdDest())
-                            .append("groupId", 3)
+                            .append("groupId", user.getCompanyId())
                             .append("roleId", 2)
                             .append("type", "IN")
                             .append("data", new Date());
-                    collection.insertOne(document);
+                    InsertOneResult insertOneResult = collection.insertOne(document);
+                    if(insertOneResult.getInsertedId() != null){
+                        // set action field
+                        action.append("action1",new Document().
+                                append("collection","user_group").
+                                append("type","INSERT").
+                                append("insert_content",document));
+
+                        return 1L;
+                    }
                 }
-                // bo nhiem thanh cong
-                return 1L;
+                else {
+                    // update roleId =2
+                    UpdateResult updateResult = collection.updateOne(Filters.eq("userId",request.getUserIdDest()),Updates.set("roleId","2"));
+                    if(updateResult.getMatchedCount() ==1){
+                        // set action field
+                        action.append("action1", new Document().append("colelction","user_group").
+                                append("userid",request.getUserIdDest()).
+                                append("type","UPDATE").
+                                append("update_content",new Document().
+                                        append("roleId","2")));
+                        return 1L;
+                    }
+                }
+                return 0L;
 
 
             } else if (request.getFlag().equalsIgnoreCase("OFF")) {
@@ -196,29 +220,45 @@ public class AdminRepositoryNative {
     }
 
 
-    public long assignSuperAdmin(AssignAdminRequest request, UserGroup userGroup) {
+    public boolean assignSuperAdmin(AssignAdminRequest request, UserGroup userGroup, Document action) {
 
         try {
             MongoDatabase database = mongoClient.getDatabase(db);
             MongoCollection<Document> collection = database.getCollection("user_group");
 
-            //update roleid cua admin va superadmin
+            //update roleId cua admin va superadmin
             Bson filterSuperAdmin = Filters.eq("userId", userGroup.getUserId());
             Bson filterAdmin = Filters.eq("userId", request.getUserIdDest());
-            Bson updateAdmin = Updates.set("roleId", 3);
-            Bson updateSuperAdmin = Updates.set("roleId", 2);
+            Bson updateAdmin = Updates.set("roleId", Constant.IS_SUPER_ADMIN);
+            Bson updateSuperAdmin = Updates.set("roleId", Constant.IS_ADMIN);
 
-            UpdateResult updateResult1 = collection.updateOne(filterAdmin, updateAdmin);
-            UpdateResult updateResult2 = collection.updateOne(filterSuperAdmin, updateSuperAdmin);
+            ClientSession session = mongoClient.startSession();
+            try  {
+                session.startTransaction();
+                UpdateResult updateResult = collection.updateOne(session, filterSuperAdmin, updateSuperAdmin);
+               UpdateResult updateResult1 =  collection.updateOne(session, filterAdmin,updateAdmin);
 
-            return updateResult1.getModifiedCount() + updateResult1.getModifiedCount();
+               if(updateResult1.getMatchedCount() == 1 && updateResult1.getMatchedCount() == 1)
+                    session.commitTransaction();
+               else {
+                   session.abortTransaction();
+                   return false;
+               }
+            } catch (Exception e) {
+                // Roll back
+                session.abortTransaction();
+                return false;
+            }
 
+            //set action log
+            action.append("action1",new Document().append("type","UPDATE").append("userid",userGroup.getUserId()).append("collection","user_group").append("update_content", new Document().append("roleId", Constant.IS_ADMIN)));
+            action.append("action2",new Document().append("type","UPDATE").append("userid",request.getUserIdDest()).append("collection","user_group").append("update_content", new Document().append("roleId", Constant.IS_SUPER_ADMIN)));
 
         } catch (Exception e) {
             e.printStackTrace();
             log.error("assign_superadmin!", e);
         }
-        return -1;
+        return true;
     }
 
     public List<Posts> getListPostFilter(GetListPostFilterRequest request, User user) {
@@ -251,11 +291,11 @@ public class AdminRepositoryNative {
                 MongoCollection<Document> postsCollection = database.getCollection("posts");
                 MongoIterable<Document> reportedRemovedPosts = null;
                 if (request.getScope().equalsIgnoreCase("ALL")) {
-                    //lay at ca cac post bi report  cua tat ca user
+                    //lay tat ca cac post bi report  cua tat ca user
                     reportedRemovedPosts = postsCollection.find(Filters.and(
                             Filters.gt("countReport", 0), Filters.eq("status", StatusConstant.STT_ACTIVE)));
                 } else {
-                    //lay at ca cac post bi report hoac remove cua user dang dang nhap
+                    //lay tat ca cac post bi report , remove, reject, appeal reject, hoac dang doi duyet khang cao cua user dang dang nhap
                     reportedRemovedPosts = postsCollection.find(Filters.and(Filters.eq("userId", Integer.toString(user.getId())), Filters.or(
                             Filters.gt("countReport", 0), Filters.eq("status", StatusConstant.STT_REMOVED), Filters.eq("status", StatusConstant.STT_REVIEWING), Filters.eq("status", StatusConstant.STT_APPEAL_REJECT))));
                 }
@@ -365,7 +405,7 @@ public class AdminRepositoryNative {
 
     }
 
-    public long approve_reject_post(ApproveRejectPostRequest request, User user) {
+    public long approve_reject_post(ApproveRejectPostRequest request, User user, Document action) {
 
         try {
 
@@ -374,7 +414,6 @@ public class AdminRepositoryNative {
 
             if (request.getFlag().equalsIgnoreCase("APPROVE")) {
                 //approve post
-
                 ArrayList<Bson> arrL = new ArrayList<>();
                 Bson status = Updates.set("status", StatusConstant.STT_ACTIVE);
                 Bson byAdmin = Updates.set("byadmin", user.getName());
@@ -383,6 +422,14 @@ public class AdminRepositoryNative {
 
                 UpdateResult updateResult = collection.updateOne(Filters.eq("_id", request.getPostId()), arrL);
                 log.info(" => getMatchedCount: " + updateResult.getMatchedCount() + ",getModifiedCount: " + updateResult.getModifiedCount());
+
+                // set action log
+                action.append("action1",new Document().
+                        append("collection","posts").
+                        append("type","UPDATE").
+                        append("postId",request.getPostId()).
+                        append("update_content",arrL));
+                //return 1
                 return updateResult.getMatchedCount();
             } else {
                 //reject post
@@ -397,6 +444,13 @@ public class AdminRepositoryNative {
 
                 UpdateResult updateResult = collection.updateOne(Filters.eq("_id", request.getPostId()), arrL);
                 log.info(" => getMatchedCount: " + updateResult.getMatchedCount() + ",getModifiedCount: " + updateResult.getModifiedCount());
+                // set action log
+                action.append("action1",new Document().
+                        append("collection","posts").
+                        append("type","UPDATE").
+                        append("postId",request.getPostId()).
+                        append("update_content",arrL));
+                //return 1
                 return updateResult.getMatchedCount();
 
             }
@@ -408,7 +462,7 @@ public class AdminRepositoryNative {
     }
 
 
-    public long remove_reported_obj(ApproveRejectPostRequest request, User user) {
+    public long remove_reported_obj(ReportObjectRequest request, User user, Document action) {
 
         try {
             MongoDatabase database = mongoClient.getDatabase(db);
@@ -418,8 +472,7 @@ public class AdminRepositoryNative {
             UpdateResult updateResult = null;
 
             //kiem tra object la comment hay post
-            Document report = collection.find(Filters.eq("referenceId", request.getPostId())).first();
-            if (report.get("type", String.class).equalsIgnoreCase("COMMENT")) {
+            if (request.getType().equalsIgnoreCase("COMMENT")) {
                 collectionName = "comments";
             } else {
                 collectionName = "posts";
@@ -429,16 +482,37 @@ public class AdminRepositoryNative {
 
             if (request.getFlag().equalsIgnoreCase(StatusConstant.STT_REMOVED)) {
                 //flag = REMOVE
-                updateResult = collection.updateOne(Filters.eq("_id", request.getPostId()), Updates.set("status", StatusConstant.STT_REMOVED));
+                updateResult = collection.updateOne(Filters.eq("_id", request.getReferenceId()), Updates.set("status", StatusConstant.STT_REMOVED));
+
+                // set action log
+                action.append("action1",new Document().
+                        append("collection",collectionName).
+                        append("type","UPDATE").
+                        append("referenceId",request.getReferenceId()).
+                        append("update_content",Updates.set("status", StatusConstant.STT_REMOVED)));
             } else {
                 //flag = REJECT
-                updateResult = collection.updateOne(Filters.eq("_id", request.getPostId()), Updates.set("countReport", 0));
+                updateResult = collection.updateOne(Filters.eq("_id", request.getReferenceId()), Updates.set("countReport", 0));
+                // set action log
+                action.append("action1",new Document().
+                        append("collection",collectionName).
+                        append("type","UPDATE").
+                        append("referenceId",request.getReferenceId()).
+                        append("update_content",Updates.set("countReport", 0)));
             }
             count += updateResult.getMatchedCount();
 
             //set isRead = 1 tai bang reports
             collection = database.getCollection("reports");
-            updateResult = collection.updateMany(Filters.eq("referenceId", request.getPostId()), Updates.set("isRead", "1"));
+            updateResult = collection.updateMany(Filters.eq("referenceId", request.getReferenceId()), Updates.set("isRead", "1"));
+
+            // set action log
+            action.append("action2",new Document().
+                    append("collection","reports").
+                    append("type","UPDATE").
+                    append("referenceId",request.getReferenceId()).
+                    append("update_content",Updates.set("isRead", "1")));
+
             count += updateResult.getMatchedCount();
 
             return count;
@@ -449,14 +523,14 @@ public class AdminRepositoryNative {
         return 0;
     }
 
-    public long appeal_content(AppealPostRequest request, User user) {
+    public long appeal_content(AppealPostRequest request, User user, Document action) {
 
         try {
             MongoDatabase database = mongoClient.getDatabase(db);
             MongoCollection<Document> collection = database.getCollection("appeal_content");
             // tao ban ghi moi tai bang appeal_content
             SecureRandom random = new SecureRandom();
-            String id = "appeal_" + new BigInteger(130, random).toString(16);
+            String id = "appeal" + new BigInteger(130, random).toString(16);
 
             Document document = new Document();
             document.append("_id", id);
@@ -468,11 +542,22 @@ public class AdminRepositoryNative {
 
             InsertOneResult insertOneResult = collection.insertOne(document);
 
+            // set action log
+            action.append("action1",new Document().
+                    append("collection","appeal_content").
+                    append("type","INSERT").
+                    append("insert_content",document));
+
             // update status trong bang posts la REVIEWING
             collection = database.getCollection("posts");
             UpdateResult updateResult = collection.updateOne(Filters.eq("_id", request.getPostId()), Updates.set("status", StatusConstant.STT_REVIEWING));
 
-
+            //set action log
+            action.append("action2",new Document().
+                    append("collection","posts").
+                    append("postId",request.getPostId()).
+                    append("type","UPDATE").
+                    append("update_content",Updates.set("status", StatusConstant.STT_REVIEWING)));
             return insertOneResult.getInsertedId() != null && updateResult.getMatchedCount() == 1 ? 1 : 0;
 
         } catch (Exception e) {
@@ -484,60 +569,81 @@ public class AdminRepositoryNative {
     }
 
 
-    public boolean report_obj(ApproveRejectPostRequest request, User user) {
+    public boolean report_obj(ReportObjectRequest request, User user, Document action) {
 
         try {
+
+            ClientSession session = mongoClient.startSession();
+            try{
+                session.startTransaction();
+
             MongoDatabase database = mongoClient.getDatabase(db);
             MongoCollection<Document> collection = database.getCollection("reports");
-            String type = request.getPostId().trim().split("_")[0];
             String collectionName =null;
 
             SecureRandom random = new SecureRandom();
-            String id = "report_" + new BigInteger(130, random).toString(16);
+            String id = "report"+   new BigInteger(130, random).toString(16);
 
             Document document = new Document("content", request.getReason());
             document.append("_id",id);
             document.append("report_temp", request.getReportType());
             document.append("userId", Integer.toString(user.getId()));
-            document.append("referenceId", request.getPostId());
-            if (type.equalsIgnoreCase("comment")) {
-                document.append("type", "COMMENT");
-                collectionName = "comments";
-            } else {
-                document.append("type", "POST");
-                collectionName = "posts";
-            }
+            document.append("referenceId", request.getReferenceId());
+            document.append("type", request.getType());
             document.append("status", "1");
             document.append("isRead", "0");
             document.append("createDate", new Date());
 
             // insert one vao bang "reports"
-            InsertOneResult insertOneResult = collection.insertOne(document);
+            InsertOneResult insertOneResult = collection.insertOne(session,document);
             if (insertOneResult.getInsertedId() == null) {
                 return false;
             }
+            // set action log
+            action.append("action1",new Document().
+                    append("collection","reports").
+                    append("type","INSERT").
+                    append("insert_content",document));
 
             UpdateResult updateResult = null;
             // update countreport trong bang "comments" hoac "posts"
-            if(collectionName.equalsIgnoreCase("comments")){
+            if(request.getType().equalsIgnoreCase("COMMENT")){
+                collectionName = "comments";
                 collection = database.getCollection("comments");
-               updateResult=  collection.updateOne(Filters.eq("_id",request.getPostId()),Updates.inc("countReport",1));
+                updateResult=  collection.updateOne(session,Filters.eq("_id",request.getReferenceId()),Updates.inc("countReport",1));
             }
             else {
+                collectionName = "posts";
                 collection = database.getCollection("posts");
-                updateResult = collection.updateOne(Filters.eq("_id",request.getPostId()),Updates.inc("countReport",1));
+                updateResult = collection.updateOne(session,Filters.eq("_id",request.getReferenceId()),Updates.inc("countReport",1));
             }
 
+            // set action log
+            action.append("action2",new Document().
+                    append("collection",collectionName).
+                    append("type","UPDATE").
+                    append("_id",request.getReferenceId()).
+                    append("update_content",Updates.inc("countReport",1)));
+
             if(updateResult.getMatchedCount() == 1){
+                session.commitTransaction();
                 return true;
             }
-            return false;
+            else {
+                session.abortTransaction();
+            }
+
+            }catch (Exception e){
+                //roll back
+                session.abortTransaction();
+                return false;
+            }
+
         } catch (Exception e) {
             log.info(e.getMessage());
         }
         return false;
     }
-
 
     public boolean approve_appeal(ApproveRejectPostRequest request, User user, Document action) {
 
@@ -692,5 +798,27 @@ public class AdminRepositoryNative {
         }
 
         return reportDTO;
+    }
+
+    public List<Comment> getListCommentFilter(GetListPostFilterRequest request, User user) {
+
+        MongoDatabase database = mongoClient.getDatabase(db);
+        MongoCollection<Document> postsCollection = database.getCollection("comments");
+        MongoIterable<Document> reportedRemovedComments = null;
+        if (request.getScope().equalsIgnoreCase("ALL")) {
+            //lay tat ca cac comment bi report  cua tat ca user
+            reportedRemovedComments = postsCollection.find(Filters.and(
+                    Filters.gt("countReport", 0), Filters.eq("status", StatusConstant.STT_ACTIVE)));
+        } else {
+            //lay tat ca cac comment bi report, remove cua user dang dang nhap
+            reportedRemovedComments = postsCollection.find(Filters.and(Filters.eq("userId", Integer.toString(user.getId())), Filters.or(
+                    Filters.gt("countReport", 0), Filters.eq("status", StatusConstant.STT_REMOVED))));
+        }
+
+        ObjectMapper objectMapper = new ObjectMapper();
+        List<Comment> listComment = new ArrayList<>();
+        listComment = reportedRemovedComments.map(p -> objectMapper.convertValue(p, Comment.class)).into(new ArrayList<>());
+
+        return listComment;
     }
 }

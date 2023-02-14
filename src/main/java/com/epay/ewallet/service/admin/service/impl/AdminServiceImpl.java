@@ -3,10 +3,10 @@ package com.epay.ewallet.service.admin.service.impl;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import com.epay.ewallet.service.admin.constant.Constant;
 import com.epay.ewallet.service.admin.model.*;
 import com.epay.ewallet.service.admin.payloads.request.*;
-import com.epay.ewallet.service.admin.payloads.response.ReportDTO;
-import com.epay.ewallet.service.admin.payloads.response.UserDTO;
+import com.epay.ewallet.service.admin.payloads.response.*;
 import com.epay.ewallet.service.admin.repository.*;
 import com.epay.ewallet.service.admin.service.UserService;
 import org.apache.logging.log4j.LogManager;
@@ -16,7 +16,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import com.epay.ewallet.service.admin.constant.EcodeConstant;
-import com.epay.ewallet.service.admin.payloads.response.CommonResponse;
 import com.epay.ewallet.service.admin.service.AdminService;
 import com.epay.ewallet.service.admin.service.CodeService;
 
@@ -61,7 +60,6 @@ public class AdminServiceImpl implements AdminService {
 //		LinkedHashMap<String, Object> data = new LinkedHashMap<>();
 
         log.info("Approve post service start.......");
-
         response.setEcode(EcodeConstant.SUCCESS);
         response.setMessage(EcodeConstant.SUCCESS_MSG);
         response.setP_ecode(EcodeConstant.SUCCESS);
@@ -178,7 +176,7 @@ public class AdminServiceImpl implements AdminService {
     }
 
     @Override
-    public CommonResponse<Object> assign_admin(AssignAdminRequest request, User user, String requestId) {
+    public CommonResponse<Object> assign_admin(AssignAdminRequest request, User user, String requestId, Document action) {
 
         CommonResponse<Object> response = new CommonResponse<Object>();
 
@@ -201,11 +199,21 @@ public class AdminServiceImpl implements AdminService {
 
         log.info("assign admin service start .....");
 
+        // kiem tra role id cua user duoc bo nhiem  trong bang user_group neu co
+        // user nay khong phai la superadmin
+        UserGroup userDestGroup = userGroupRepository.findByUserId(request.getUserIdDest(),"1");
+        if(userDestGroup != null){
+            if(userDestGroup.getRoleId() == Constant.IS_SUPER_ADMIN){
+                // user laf super admin
+                response.setEcode(EcodeConstant.ERROR_IS_ADMIN);
+                return  response;
+            }
+        }
 
         UserGroup userGroup = userGroupRepository.findByUserId(Integer.toString(user.getId()), "1");
         log.info("Check quyền SupperAdmin");
         if (userGroup != null) {
-            if (userGroup.getRoleId() < 3) { //neu user khong phai la super admin
+            if (userGroup.getRoleId() != Constant.IS_SUPER_ADMIN) { //neu user khong phai la super admin
                 response.setEcode(EcodeConstant.ERROR_NOT_ADMIN);
 //				data.put("result", false);
 //				response.setData(data);
@@ -218,28 +226,28 @@ public class AdminServiceImpl implements AdminService {
             return response;
         }
 
+        long count = adminRepositoryNative.assignAdmin(request,user,action);
 
-        long count = adminRepositoryNative.assignAdmin(request);
-
-        if (count > 0) { //
+        if (count > 0) {
+            // bo nhiem hoac mien nhiem  thanh cong
             response.setEcode(EcodeConstant.SUCCESS);
         } else {
+            // that bai
             response.setEcode(EcodeConstant.ERR);
         }
-
 
         return response;
     }
 
     @Override
-    public CommonResponse<Object> assign_superadmin(AssignAdminRequest request, User user, String requestId) {
+    public CommonResponse<Object> assign_superadmin(AssignAdminRequest request, User user, String requestId, Document action) {
 
         CommonResponse<Object> response = new CommonResponse<>();
 
         UserGroup userGroup = userGroupRepository.findByUserId(Integer.toString(user.getId()), "1");
-        log.info("Check quyền SupperAdmin");
+        log.info("Check quyen superadmin");
         if (userGroup != null) {
-            if (userGroup.getRoleId() < 3) { //neu user khong phai la super admin
+            if (userGroup.getRoleId() != Constant.IS_SUPER_ADMIN) { //neu user khong phai la super admin
                 response.setEcode(EcodeConstant.ERROR_NOT_ADMIN);
 //				data.put("result", false);
 //				response.setData(data);
@@ -254,20 +262,23 @@ public class AdminServiceImpl implements AdminService {
 
         // kiem tra xem user duoc nhuong quyen co phai la admin
         UserGroup checkadmin = userGroupRepository.findByUserId(request.getUserIdDest(), "1");
-        if (checkadmin == null || checkadmin.getRoleId() != 2) {
+        if (checkadmin == null || checkadmin.getRoleId() != Constant.IS_ADMIN) {
+            // neu la super admin hoac khang phai la admin , thong bao loi
             response.setEcode(EcodeConstant.INVALID_USER);
             return response;
         }
 
 
-        long count = adminRepositoryNative.assignSuperAdmin(request, userGroup);
+        boolean check = adminRepositoryNative.assignSuperAdmin(request, userGroup,action);
 
-        if (count == 2) {
+
+        if (check ) {
+        // update thanh cong
             response.setEcode(EcodeConstant.SUCCESS);
         } else {
+            // update that bai
             response.setEcode(EcodeConstant.ERR);
         }
-
 
         return response;
     }
@@ -301,7 +312,7 @@ public class AdminServiceImpl implements AdminService {
             log.info("Check quyền admin: " + user.getId());
 
             if (userGroup != null) {
-                if (userGroup.getRoleId() < 2) { //neu user khong phai la  admin
+                if (userGroup.getRoleId() < Constant.IS_ADMIN) { //neu user khong phai la  admin
                     response.setEcode(EcodeConstant.ERROR_NOT_ADMIN);
 //				data.put("result", false);
 //				response.setData(data);
@@ -321,7 +332,7 @@ public class AdminServiceImpl implements AdminService {
                 //check user do thuoc group nao
                 UserGroup userGroup1 = userGroupRepository.findByUserId(Integer.toString(user.getId()), "1");
                 if (userGroup1 == null) {
-                    // tra ve loi approve post is not enable
+                    // tra ve loi user khong phai admin
                     response.setEcode(EcodeConstant.ERROR_NOT_ADMIN);
                     return response;
                 } else {
@@ -329,12 +340,12 @@ public class AdminServiceImpl implements AdminService {
                     Groupsetting groupsetting = groupsettingRepository.findBygroupIdAndReferenceId(userGroup1.getGroupId());
                     if (groupsetting == null) {
                         // tra ve loi approve post is not enable
-                        response.setEcode(EcodeConstant.ERROR_NOT_ADMIN);
+                        response.setEcode(EcodeConstant.APPROVE_POST_NOT_ENABLE);
                         return response;
                     } else {
                         if (groupsetting.getEn_admin_approve_post().equalsIgnoreCase("OFF")) {
                             // tra ve loi approve post is not enable
-                            response.setEcode(EcodeConstant.ERROR_NOT_ADMIN);
+                            response.setEcode(EcodeConstant.APPROVE_POST_NOT_ENABLE);
                             return response;
                         }
                     }
@@ -342,6 +353,7 @@ public class AdminServiceImpl implements AdminService {
             }
         }
 
+        // fetch data
         List<Posts> listPosts = adminRepositoryNative.getListPostFilter(request, user);
 
         if (listPosts.size() == 0) {
@@ -351,6 +363,7 @@ public class AdminServiceImpl implements AdminService {
         } else {
             response.setEcode(EcodeConstant.SUCCESS);
         }
+
         //lay danh sach userid tuong ung voi  moi post
         List<String> userIds = listPosts.stream().map(p -> p.getUserId()).collect(Collectors.toList());
 
@@ -378,20 +391,27 @@ public class AdminServiceImpl implements AdminService {
         if (listTag != null)
             postId_Tags = listTag.stream().collect(Collectors.groupingBy(h -> h.getPostId(), Collectors.toList()));
 
+        List<PostDTO> postDTOList  = new ArrayList<>();
+        postDTOList = listPosts.stream().map(p->new PostDTO(p)).collect(Collectors.toList());
+
         // set image, user, tags
-        for (Posts p : listPosts) {
-            if (postId_media.get(p.get_id()) != null) {
-                p.setImages(postId_media.get(p.get_id()));
+        for (PostDTO p : postDTOList) {
+            if (postId_media.get(p.getPostId()) != null) {
+                p.setImages(postId_media.get(p.getPostId()));
             }
+
             p.setUser(userId_UserDTO.get(p.getUserId()));
-            p.setHashTags(postId_HashTags.get(p.get_id()));
-            p.setTags(postId_Tags.get(p.get_id()));
+            p.setHashTags(postId_HashTags.get(p.getPostId()));
+            p.setTagList(postId_Tags.get(p.getPostId()));
         }
 
+        GetListPostFilterDTO data = new GetListPostFilterDTO(postDTOList);
+
+        // neu flag = REPORTED_REMOVED, fet du lieu tu bang comment
+        List<Comment> listComment = adminRepositoryNative.getListCommentFilter(request,user);
+        data.setListComment(listComment);
         // set data
-        response.setData(listPosts);
-
-
+        response.setData(data);
         return response;
     }
 
@@ -408,13 +428,13 @@ public class AdminServiceImpl implements AdminService {
     }
 
     @Override
-    public CommonResponse<Object> approve_reject_post(ApproveRejectPostRequest request, User user, String requestId) {
+    public CommonResponse<Object> approve_reject_post(ApproveRejectPostRequest request, User user, String requestId, Document action) {
 
         CommonResponse<Object> response = new CommonResponse<>();
 
 
         // kiem tra flag
-        List<String> arr = new ArrayList<String>();
+        List<String> arr = new ArrayList<>();
         arr.add("APPROVE");
         arr.add("REJECT");
         if (!arr.contains(request.getFlag())) {
@@ -455,7 +475,7 @@ public class AdminServiceImpl implements AdminService {
         }
 
 
-        long count = adminRepositoryNative.approve_reject_post(request, user);
+        long count = adminRepositoryNative.approve_reject_post(request, user,action);
 
         if (count == 1) {
             response.setEcode(EcodeConstant.SUCCESS);
@@ -469,7 +489,7 @@ public class AdminServiceImpl implements AdminService {
     }
 
     @Override
-    public CommonResponse<Object> remove_reported_obj(ApproveRejectPostRequest request, User user, String requestId) {
+    public CommonResponse<Object> remove_reported_obj(ReportObjectRequest request, User user, String requestId, Document action) {
 
         CommonResponse<Object> response = new CommonResponse<>();
 
@@ -485,6 +505,7 @@ public class AdminServiceImpl implements AdminService {
                 return response;
             }
 
+
         //kiem tra quyen admin
         UserGroup userGroup = userGroupRepository.findByUserId(Integer.toString(user.getId()), "1");
         log.info("Check quyền admin");
@@ -498,26 +519,26 @@ public class AdminServiceImpl implements AdminService {
             return response;
         }
 
-        long count = adminRepositoryNative.remove_reported_obj(request, user);
+        long count = adminRepositoryNative.remove_reported_obj(request, user,action);
 
         if (count >= 2) {
             response.setEcode(EcodeConstant.SUCCESS);
-            response.setData(request.getPostId());
+            response.setData(request.getReferenceId());
             return response;
         } else {
             response.setEcode(EcodeConstant.ERR);
-            response.setData(request.getPostId());
+            response.setData(request.getReferenceId());
             return response;
         }
 
     }
 
     @Override
-    public CommonResponse<Object> appeal_post(AppealPostRequest request, User user, String requestId) {
+    public CommonResponse<Object> appeal_post(AppealPostRequest request, User user, String requestId, Document action) {
 
 
         CommonResponse<Object> response = new CommonResponse<>();
-        long count = adminRepositoryNative.appeal_content(request, user);
+        long count = adminRepositoryNative.appeal_content(request, user,action);
 
         if (count == 1) {
             response.setEcode(EcodeConstant.SUCCESS);
@@ -529,7 +550,7 @@ public class AdminServiceImpl implements AdminService {
     }
 
     @Override
-    public CommonResponse<Object> report_obj(ApproveRejectPostRequest request, User user, String requestId) {
+    public CommonResponse<Object> report_obj(ReportObjectRequest request, User user, String requestId, Document action) {
 
         CommonResponse<Object> response = new CommonResponse<>();
         //check user role (la admin thi bao loi)
@@ -542,10 +563,8 @@ public class AdminServiceImpl implements AdminService {
         }
 
         //check user co phai la chu bai viet/comment (neu la chu bai viet thi bao loi)
-        String type = null;
-        type = request.getPostId().trim().split("_")[0];
-        if (type.equalsIgnoreCase("post")) {
-            Optional<Posts> posts = postsRepository.findById(request.getPostId());
+        if (request.getType().equalsIgnoreCase("POST")) {
+            Optional<Posts> posts = postsRepository.findById(request.getReferenceId());
             if (posts.isPresent()) {
                 if (posts.get().getUserId().equalsIgnoreCase(Integer.toString(user.getId()))) {
                     //thong bao user la chu bai viet
@@ -553,8 +572,8 @@ public class AdminServiceImpl implements AdminService {
                     return response;
                 }
             }
-        } else if (type.equalsIgnoreCase("comment")) {
-            Optional<Comment> comments = commentRepository.findById(request.getPostId());
+        } else if (request.getType().equalsIgnoreCase("COMMENT")) {
+            Optional<Comment> comments = commentRepository.findById(request.getReferenceId());
             if (comments.isPresent()) {
                 if (comments.get().getUserId().equalsIgnoreCase(Integer.toString(user.getId()))) {
                     //thong bao user la chu bai viet
@@ -567,18 +586,20 @@ public class AdminServiceImpl implements AdminService {
             return response;
         }
 
-        boolean flag = adminRepositoryNative.report_obj(request, user);
+
+        boolean flag = adminRepositoryNative.report_obj(request, user,action);
         if (flag) {
             response.setEcode(EcodeConstant.SUCCESS);
-            response.setData(request.getPostId());
+            response.setData(request.getReferenceId());
             return response;
         } else {
             response.setEcode(EcodeConstant.ERR);
-            response.setData(request.getPostId());
+            response.setData(request.getReferenceId());
             return response;
         }
 
     }
+
 
     @Override
     public CommonResponse<Object> approve_appeal(ApproveRejectPostRequest request, User user, String requestId, Document action) {

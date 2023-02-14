@@ -30,47 +30,6 @@ public class Posts {
     private String postByRole;
     private int countReport;
 
-    @Transient
-    List<String> images;
-    @Transient
-    UserDTO user;
-    @Transient
-    List<HashTags> hashTags;
-
-    @Transient
-    List<Tags> tags;
-
-    public List<Tags> getTags() {
-        return tags;
-    }
-
-    public void setTags(List<Tags> tags) {
-        this.tags = tags;
-    }
-
-    public List<HashTags> getHashTags() {
-        return hashTags;
-    }
-
-    public void setHashTags(List<HashTags> hashTags) {
-        this.hashTags = hashTags;
-    }
-
-    public List<String> getImages() {
-        return images;
-    }
-
-    public void setImages(List<String> images) {
-        this.images = images;
-    }
-
-    public UserDTO getUser() {
-        return user;
-    }
-
-    public void setUser(UserDTO user) {
-        this.user = user;
-    }
 
     public Posts() {
     }
