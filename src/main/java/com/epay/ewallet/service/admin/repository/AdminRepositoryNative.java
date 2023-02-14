@@ -232,13 +232,18 @@ public class AdminRepositoryNative {
             Bson updateAdmin = Updates.set("roleId", Constant.IS_SUPER_ADMIN);
             Bson updateSuperAdmin = Updates.set("roleId", Constant.IS_ADMIN);
 
-
             ClientSession session = mongoClient.startSession();
             try  {
                 session.startTransaction();
-                collection.updateOne(session, filterSuperAdmin, updateSuperAdmin);
-                collection.updateOne(session, filterAdmin,updateAdmin);
-                session.commitTransaction();
+                UpdateResult updateResult = collection.updateOne(session, filterSuperAdmin, updateSuperAdmin);
+               UpdateResult updateResult1 =  collection.updateOne(session, filterAdmin,updateAdmin);
+
+               if(updateResult1.getMatchedCount() == 1 && updateResult1.getMatchedCount() == 1)
+                    session.commitTransaction();
+               else {
+                   session.abortTransaction();
+                   return false;
+               }
             } catch (Exception e) {
                 // Roll back
                 session.abortTransaction();
@@ -457,7 +462,7 @@ public class AdminRepositoryNative {
     }
 
 
-    public long remove_reported_obj(ApproveRejectPostRequest request, User user, Document action) {
+    public long remove_reported_obj(ReportObjectRequest request, User user, Document action) {
 
         try {
             MongoDatabase database = mongoClient.getDatabase(db);
@@ -467,8 +472,7 @@ public class AdminRepositoryNative {
             UpdateResult updateResult = null;
 
             //kiem tra object la comment hay post
-            Document report = collection.find(Filters.eq("referenceId", request.getPostId())).first();
-            if (report.get("type", String.class).equalsIgnoreCase("COMMENT")) {
+            if (request.getType().equalsIgnoreCase("COMMENT")) {
                 collectionName = "comments";
             } else {
                 collectionName = "posts";
@@ -478,35 +482,35 @@ public class AdminRepositoryNative {
 
             if (request.getFlag().equalsIgnoreCase(StatusConstant.STT_REMOVED)) {
                 //flag = REMOVE
-                updateResult = collection.updateOne(Filters.eq("_id", request.getPostId()), Updates.set("status", StatusConstant.STT_REMOVED));
+                updateResult = collection.updateOne(Filters.eq("_id", request.getReferenceId()), Updates.set("status", StatusConstant.STT_REMOVED));
 
                 // set action log
                 action.append("action1",new Document().
                         append("collection",collectionName).
                         append("type","UPDATE").
-                        append("postId",request.getPostId()).
+                        append("referenceId",request.getReferenceId()).
                         append("update_content",Updates.set("status", StatusConstant.STT_REMOVED)));
             } else {
                 //flag = REJECT
-                updateResult = collection.updateOne(Filters.eq("_id", request.getPostId()), Updates.set("countReport", 0));
+                updateResult = collection.updateOne(Filters.eq("_id", request.getReferenceId()), Updates.set("countReport", 0));
                 // set action log
                 action.append("action1",new Document().
                         append("collection",collectionName).
                         append("type","UPDATE").
-                        append("postId",request.getPostId()).
+                        append("referenceId",request.getReferenceId()).
                         append("update_content",Updates.set("countReport", 0)));
             }
             count += updateResult.getMatchedCount();
 
             //set isRead = 1 tai bang reports
             collection = database.getCollection("reports");
-            updateResult = collection.updateMany(Filters.eq("referenceId", request.getPostId()), Updates.set("isRead", "1"));
+            updateResult = collection.updateMany(Filters.eq("referenceId", request.getReferenceId()), Updates.set("isRead", "1"));
 
             // set action log
             action.append("action2",new Document().
                     append("collection","reports").
                     append("type","UPDATE").
-                    append("postId",request.getPostId()).
+                    append("referenceId",request.getReferenceId()).
                     append("update_content",Updates.set("isRead", "1")));
 
             count += updateResult.getMatchedCount();
@@ -565,12 +569,16 @@ public class AdminRepositoryNative {
     }
 
 
-    public boolean report_obj(ApproveRejectPostRequest request, User user, Document action) {
+    public boolean report_obj(ReportObjectRequest request, User user, Document action) {
 
         try {
+
+            ClientSession session = mongoClient.startSession();
+            try{
+                session.startTransaction();
+
             MongoDatabase database = mongoClient.getDatabase(db);
             MongoCollection<Document> collection = database.getCollection("reports");
-            String type = request.getPostId().trim().split("_")[0];
             String collectionName =null;
 
             SecureRandom random = new SecureRandom();
@@ -580,20 +588,14 @@ public class AdminRepositoryNative {
             document.append("_id",id);
             document.append("report_temp", request.getReportType());
             document.append("userId", Integer.toString(user.getId()));
-            document.append("referenceId", request.getPostId());
-            if (type.equalsIgnoreCase("comment")) {
-                document.append("type", "COMMENT");
-                collectionName = "comments";
-            } else {
-                document.append("type", "POST");
-                collectionName = "posts";
-            }
+            document.append("referenceId", request.getReferenceId());
+            document.append("type", request.getType());
             document.append("status", "1");
             document.append("isRead", "0");
             document.append("createDate", new Date());
 
             // insert one vao bang "reports"
-            InsertOneResult insertOneResult = collection.insertOne(document);
+            InsertOneResult insertOneResult = collection.insertOne(session,document);
             if (insertOneResult.getInsertedId() == null) {
                 return false;
             }
@@ -605,32 +607,43 @@ public class AdminRepositoryNative {
 
             UpdateResult updateResult = null;
             // update countreport trong bang "comments" hoac "posts"
-            if(collectionName.equalsIgnoreCase("comments")){
+            if(request.getType().equalsIgnoreCase("COMMENT")){
+                collectionName = "comments";
                 collection = database.getCollection("comments");
-               updateResult=  collection.updateOne(Filters.eq("_id",request.getPostId()),Updates.inc("countReport",1));
+                updateResult=  collection.updateOne(session,Filters.eq("_id",request.getReferenceId()),Updates.inc("countReport",1));
             }
             else {
+                collectionName = "posts";
                 collection = database.getCollection("posts");
-                updateResult = collection.updateOne(Filters.eq("_id",request.getPostId()),Updates.inc("countReport",1));
+                updateResult = collection.updateOne(session,Filters.eq("_id",request.getReferenceId()),Updates.inc("countReport",1));
             }
 
             // set action log
             action.append("action2",new Document().
                     append("collection",collectionName).
                     append("type","UPDATE").
-                    append("_id",request.getPostId()).
+                    append("_id",request.getReferenceId()).
                     append("update_content",Updates.inc("countReport",1)));
 
             if(updateResult.getMatchedCount() == 1){
+                session.commitTransaction();
                 return true;
             }
-            return false;
+            else {
+                session.abortTransaction();
+            }
+
+            }catch (Exception e){
+                //roll back
+                session.abortTransaction();
+                return false;
+            }
+
         } catch (Exception e) {
             log.info(e.getMessage());
         }
         return false;
     }
-
 
     public boolean approve_appeal(ApproveRejectPostRequest request, User user, Document action) {
 

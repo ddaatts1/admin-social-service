@@ -26,11 +26,11 @@ public interface AdminService {
 
 	CommonResponse<Object> approve_reject_post(ApproveRejectPostRequest approveRejectPostRequest, User user, String requestId, Document action);
 
-	CommonResponse<Object> remove_reported_obj(ApproveRejectPostRequest approveRejectPostRequest, User user, String requestId, Document action);
+	CommonResponse<Object> remove_reported_obj(ReportObjectRequest approveRejectPostRequest, User user, String requestId, Document action);
 
     CommonResponse<Object> appeal_post(AppealPostRequest appealPostRequest, User user, String requestId, Document action);
 
-	CommonResponse<Object> report_obj(ApproveRejectPostRequest reportObjRequest, User user, String requestId, Document action);
+	CommonResponse<Object> report_obj(ReportObjectRequest reportObjRequest, User user, String requestId, Document action);
 
 	CommonResponse<Object> approve_appeal(ApproveRejectPostRequest approve_appeal, User user, String requestId, Document action);
 }

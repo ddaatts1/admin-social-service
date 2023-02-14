@@ -5,6 +5,7 @@ import java.util.Date;
 import java.util.List;
 import java.util.Map;
 
+import com.epay.ewallet.service.admin.model.Comment;
 import com.epay.ewallet.service.admin.model.Posts;
 import com.epay.ewallet.service.admin.payloads.request.*;
 import com.epay.ewallet.service.admin.repository.AdminRepositoryNative;
@@ -61,6 +62,16 @@ public class AdminController {
     MongoClient mongoClient;
     @Value("${spring.data.mongodb.database_}")
     private String db;
+
+
+//    @GetMapping("/test")
+//    public Document test(){
+//        MongoDatabase database = mongoClient.getDatabase(db);
+//        MongoCollection<Document> collection = database.getCollection("comments");
+//        Document comment = collection.find(Filters.eq("_id","ACTIVE")).first();
+//
+//        return comment;
+//    }
 
     @GetMapping("/")
     public List<Posts> index() {
@@ -724,8 +735,8 @@ public class AdminController {
         log.info("===> REMOVE_REPORTED_OBJ => encrypted: " + encrypted + " => requestId: " + requestId + " => request raw from client: " + requestRaw.toString());
 
 
-        ApproveRejectPostRequest approveRejectPostRequest = decodeData.getRequest(requestId, logCategory, requestRaw,
-                ApproveRejectPostRequest.class, encrypted, deviceId);
+        ReportObjectRequest approveRejectPostRequest = decodeData.getRequest(requestId, logCategory, requestRaw,
+                ReportObjectRequest.class, encrypted, deviceId);
 
         log.info("===========> REMOVE_REPORTED_OBJ => requestId: " + requestId + " => request clear from client: " + approveRejectPostRequest.toString());
 
@@ -792,7 +803,6 @@ public class AdminController {
         }
     }
 
-
     @RequestMapping(value = "/admin/REPORT_OBJ", method = RequestMethod.POST)
     public CommonResponse<Object> report_obj(@RequestBody JsonNode requestRaw,
                                              @RequestHeader Map<String, String> header,
@@ -808,8 +818,8 @@ public class AdminController {
 
         log.info("===> REPORT_OBJ => encrypted: " + encrypted + " => requestId: " + requestId + " => request raw from client: " + requestRaw.toString());
 
-        ApproveRejectPostRequest reportObjRequest = decodeData.getRequest(requestId, logCategory, requestRaw,
-                ApproveRejectPostRequest.class, encrypted, deviceId);
+        ReportObjectRequest reportObjRequest = decodeData.getRequest(requestId, logCategory, requestRaw,
+                ReportObjectRequest.class, encrypted, deviceId);
 
         log.info("===========> REPORT_OBJ => requestId: " + requestId + " => request clear from client: " + reportObjRequest.toString());
 
@@ -859,7 +869,7 @@ public class AdminController {
                 response.setMessage(ecode.getMessage());
                 response.setP_ecode(ecode.getP_ecode());
                 response.setP_message(ecode.getP_message());
-                response.setData(reportObjRequest.getPostId());
+                response.setData(reportObjRequest.getReferenceId());
             }
 
             log.info("===> REPORT_OBJ => response clear: " + new Gson().toJson(response));
@@ -874,6 +884,9 @@ public class AdminController {
 
         }
     }
+
+
+
 
     @RequestMapping(value = "/admin/APPEAL_POST", method = RequestMethod.POST)
     public CommonResponse<Object> appeal_post(@RequestBody JsonNode requestRaw,

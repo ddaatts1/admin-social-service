@@ -369,8 +369,6 @@ public class AdminServiceImpl implements AdminService {
 
         // fetch user, hashtag, tag va image de them vao post
 
-        // type
-
         //image
         List<Document> listMedia = adminRepositoryNative.getListMediaByListPosts(listPosts);
         //map postId voi danh sach sanh tuong ung, group by referenceId
@@ -436,7 +434,7 @@ public class AdminServiceImpl implements AdminService {
 
 
         // kiem tra flag
-        List<String> arr = new ArrayList<String>();
+        List<String> arr = new ArrayList<>();
         arr.add("APPROVE");
         arr.add("REJECT");
         if (!arr.contains(request.getFlag())) {
@@ -491,7 +489,7 @@ public class AdminServiceImpl implements AdminService {
     }
 
     @Override
-    public CommonResponse<Object> remove_reported_obj(ApproveRejectPostRequest request, User user, String requestId, Document action) {
+    public CommonResponse<Object> remove_reported_obj(ReportObjectRequest request, User user, String requestId, Document action) {
 
         CommonResponse<Object> response = new CommonResponse<>();
 
@@ -506,6 +504,7 @@ public class AdminServiceImpl implements AdminService {
                 response.setEcode(EcodeConstant.FLAG_NULL_EMPTY);
                 return response;
             }
+
 
         //kiem tra quyen admin
         UserGroup userGroup = userGroupRepository.findByUserId(Integer.toString(user.getId()), "1");
@@ -524,11 +523,11 @@ public class AdminServiceImpl implements AdminService {
 
         if (count >= 2) {
             response.setEcode(EcodeConstant.SUCCESS);
-            response.setData(request.getPostId());
+            response.setData(request.getReferenceId());
             return response;
         } else {
             response.setEcode(EcodeConstant.ERR);
-            response.setData(request.getPostId());
+            response.setData(request.getReferenceId());
             return response;
         }
 
@@ -551,7 +550,7 @@ public class AdminServiceImpl implements AdminService {
     }
 
     @Override
-    public CommonResponse<Object> report_obj(ApproveRejectPostRequest request, User user, String requestId, Document action) {
+    public CommonResponse<Object> report_obj(ReportObjectRequest request, User user, String requestId, Document action) {
 
         CommonResponse<Object> response = new CommonResponse<>();
         //check user role (la admin thi bao loi)
@@ -564,10 +563,8 @@ public class AdminServiceImpl implements AdminService {
         }
 
         //check user co phai la chu bai viet/comment (neu la chu bai viet thi bao loi)
-        String type = null;
-        type = request.getPostId().trim().split("_")[0];
-        if (type.equalsIgnoreCase("post")) {
-            Optional<Posts> posts = postsRepository.findById(request.getPostId());
+        if (request.getType().equalsIgnoreCase("POST")) {
+            Optional<Posts> posts = postsRepository.findById(request.getReferenceId());
             if (posts.isPresent()) {
                 if (posts.get().getUserId().equalsIgnoreCase(Integer.toString(user.getId()))) {
                     //thong bao user la chu bai viet
@@ -575,8 +572,8 @@ public class AdminServiceImpl implements AdminService {
                     return response;
                 }
             }
-        } else if (type.equalsIgnoreCase("comment")) {
-            Optional<Comment> comments = commentRepository.findById(request.getPostId());
+        } else if (request.getType().equalsIgnoreCase("COMMENT")) {
+            Optional<Comment> comments = commentRepository.findById(request.getReferenceId());
             if (comments.isPresent()) {
                 if (comments.get().getUserId().equalsIgnoreCase(Integer.toString(user.getId()))) {
                     //thong bao user la chu bai viet
@@ -589,18 +586,20 @@ public class AdminServiceImpl implements AdminService {
             return response;
         }
 
+
         boolean flag = adminRepositoryNative.report_obj(request, user,action);
         if (flag) {
             response.setEcode(EcodeConstant.SUCCESS);
-            response.setData(request.getPostId());
+            response.setData(request.getReferenceId());
             return response;
         } else {
             response.setEcode(EcodeConstant.ERR);
-            response.setData(request.getPostId());
+            response.setData(request.getReferenceId());
             return response;
         }
 
     }
+
 
     @Override
     public CommonResponse<Object> approve_appeal(ApproveRejectPostRequest request, User user, String requestId, Document action) {
